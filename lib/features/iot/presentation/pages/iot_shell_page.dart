@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:jameofit/app/theme/app_theme.dart';
 import 'package:jameofit/features/iot/domain/entities/iot_entities.dart';
-import 'package:jameofit/features/iot/presentation/controllers/iot_controller.dart';
+import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
+import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
+import 'package:jameofit/features/iot/presentation/bloc/iot_state.dart';
 import 'package:jameofit/features/iot/presentation/widgets/iot_widgets.dart';
 
 class IoTShellPage extends StatefulWidget {
-  const IoTShellPage({super.key, required this.controller});
+  const IoTShellPage({super.key, required this.bloc});
 
-  final IoTController controller;
+  final IoTBloc bloc;
 
   @override
   State<IoTShellPage> createState() => _IoTShellPageState();
@@ -18,10 +20,13 @@ class _IoTShellPageState extends State<IoTShellPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.controller,
-      builder: (context, _) {
-        if (widget.controller.isLoading || widget.controller.overview == null) {
+    return StreamBuilder<IoTState>(
+      stream: widget.bloc.stream,
+      initialData: widget.bloc.state,
+      builder: (context, snapshot) {
+        final state = snapshot.data ?? const IoTInitial();
+
+        if (state is IoTInitial || state is IoTLoading) {
           return const Scaffold(
             backgroundColor: Color(0xFFF2F3EE),
             body: Center(
@@ -30,14 +35,35 @@ class _IoTShellPageState extends State<IoTShellPage> {
           );
         }
 
-        if (widget.controller.error != null) {
+        if (state is IoTFailure) {
           return Scaffold(
             backgroundColor: const Color(0xFFF2F3EE),
-            body: Center(child: Text(widget.controller.error!)),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      state.message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppTheme.ink),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () {
+                        widget.bloc.add(const IoTOverviewRequested());
+                      },
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
-        final overview = widget.controller.overview!;
+        final overview = (state as IoTLoaded).overview;
         final pages = [
           _SimpleHomePage(),
           _HistoryPage(history: overview.history),

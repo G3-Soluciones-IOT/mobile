@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:jameofit/app/theme/app_theme.dart';
-import 'package:jameofit/features/iot/data/datasources/mock_iot_data_source.dart';
+import 'package:jameofit/features/iot/data/datasources/remote_iot_data_source.dart';
 import 'package:jameofit/features/iot/data/repositories/iot_repository_impl.dart';
-import 'package:jameofit/features/iot/presentation/controllers/iot_controller.dart';
+import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
+import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
 import 'package:jameofit/features/iot/presentation/pages/iot_shell_page.dart';
 
 class JameoFitApp extends StatefulWidget {
@@ -13,21 +14,26 @@ class JameoFitApp extends StatefulWidget {
 }
 
 class _JameoFitAppState extends State<JameoFitApp> {
-  late final IoTController _controller;
+  late final IoTBloc _iotBloc;
 
   @override
   void initState() {
     super.initState();
-    _controller = IoTController(
+    const userId = int.fromEnvironment('JAMEOFIT_USER_ID', defaultValue: 1);
+    const authToken = String.fromEnvironment('JAMEOFIT_AUTH_TOKEN');
+    _iotBloc = IoTBloc(
       repository: IoTRepositoryImpl(
-        dataSource: MockIoTDataSource(),
+        dataSource: RemoteIoTDataSource(
+          userId: userId,
+          authToken: authToken,
+        ),
       ),
-    )..load();
+    )..add(const IoTOverviewRequested());
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _iotBloc.close();
     super.dispose();
   }
 
@@ -46,7 +52,7 @@ class _JameoFitAppState extends State<JameoFitApp> {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: IoTShellPage(controller: _controller),
+      home: IoTShellPage(bloc: _iotBloc),
     );
   }
 }

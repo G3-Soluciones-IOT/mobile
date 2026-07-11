@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:jameofit/app/theme/app_theme.dart';
 import 'package:jameofit/features/auth/data/auth_data_source.dart';
+import 'package:jameofit/features/chat/presentation/chat_controller.dart';
+import 'package:jameofit/features/chat/presentation/pages/communications_page.dart';
 import 'package:jameofit/features/iot/domain/entities/iot_entities.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_state.dart';
 import 'package:jameofit/features/iot/presentation/widgets/iot_widgets.dart';
+import 'package:jameofit/features/payments/data/datasources/payment_data_source.dart';
+import 'package:jameofit/features/payments/data/repositories/payment_repository_impl.dart';
+import 'package:jameofit/features/payments/presentation/bloc/payment_bloc.dart';
+import 'package:jameofit/features/payments/presentation/bloc/payment_state.dart';
+import 'package:jameofit/features/payments/presentation/pages/my_subscriptions_page.dart';
+import 'package:jameofit/features/coach/data/datasources/coach_data_source.dart';
+import 'package:jameofit/features/coach/presentation/pages/coach_page.dart';
+import 'package:jameofit/features/appointments/presentation/pages/appointments_page.dart';
+import 'package:jameofit/features/appointments/data/datasources/appointment_data_source.dart';
+import 'package:jameofit/features/appointments/data/repositories/appointment_repository_impl.dart';
+import 'package:jameofit/features/appointments/domain/repositories/appointment_repository.dart';
 
 class IoTShellPage extends StatefulWidget {
   const IoTShellPage({
@@ -13,21 +26,58 @@ class IoTShellPage extends StatefulWidget {
     required this.bloc,
     required this.session,
     required this.onLogout,
+    required this.chatController,
   });
 
   final IoTBloc bloc;
   final AuthSession session;
   final VoidCallback onLogout;
+  final ChatController chatController;
 
   @override
   State<IoTShellPage> createState() => _IoTShellPageState();
 }
 
 class _IoTShellPageState extends State<IoTShellPage> {
-  int _index = 2;
+  int _index = 0;
+  late PaymentBloc _paymentBloc;
+  late AppointmentRepository _appointmentRepository;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPaymentBloc();
+    _initAppointmentRepository();
+  }
+
+  void _initAppointmentRepository() {
+    final dataSource = AppointmentDataSource(
+      userId: widget.session.userId,
+      authToken: widget.session.token,
+    );
+    _appointmentRepository = AppointmentRepositoryImpl(dataSource: dataSource);
+  }
+
+  void _initPaymentBloc() {
+    final dataSource = PaymentDataSource(
+      userId: widget.session.userId,
+      authToken: widget.session.token,
+    );
+    final repository = PaymentRepositoryImpl(dataSource: dataSource);
+    _paymentBloc = PaymentBloc(repository: repository);
+  }
+
+  @override
+  void dispose() {
+    _paymentBloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    // The shell has six destinations after the appointments merge. Chat is
+    // index 5; index 4 is the independent Coach IA feature.
+    if (_index == 5) return _buildCommunicationsShell(context);
     return StreamBuilder<IoTState>(
       stream: widget.bloc.stream,
       initialData: widget.bloc.state,
@@ -35,10 +85,20 @@ class _IoTShellPageState extends State<IoTShellPage> {
         final state = snapshot.data ?? const IoTInitial();
 
         if (state is IoTInitial || state is IoTLoading) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: Color(0xFFF2F3EE),
             body: Center(
-              child: CircularProgressIndicator(color: AppTheme.brandGreen),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: AppTheme.brandGreen),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => setState(() => _index = 5),
+                    child: const Text('Abrir Comunicaciones'),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -64,6 +124,11 @@ class _IoTShellPageState extends State<IoTShellPage> {
                       },
                       child: const Text('Reintentar'),
                     ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => setState(() => _index = 5),
+                      child: const Text('Abrir Comunicaciones'),
+                    ),
                   ],
                 ),
               ),
@@ -72,8 +137,27 @@ class _IoTShellPageState extends State<IoTShellPage> {
         }
 
         final overview = (state as IoTLoaded).overview;
+
+        bool isPremium = false;
+
+        final paymentState = _paymentBloc.state;
+        if (paymentState is PaymentLoaded) {
+          isPremium = paymentState.isPremium;
+        }
+
+        final coachDataSource = CoachDataSource(
+          userId: widget.session.userId,
+          authToken: widget.session.token,
+        );
+
+        final homeTipFuture = coachDataSource.getHomeTip();
+
         final pages = [
           _UserSummaryPage(summary: overview.userSummary),
+          AppointmentsPage(
+            repository: _appointmentRepository,
+            userId: widget.session.userId,
+          ),
           _HistoryPage(history: overview.history),
           _DashboardPage(
             overview: overview,
@@ -85,7 +169,18 @@ class _IoTShellPageState extends State<IoTShellPage> {
               ).push(MaterialPageRoute(builder: (_) => page));
             },
           ),
-          _CoachPage(conversation: overview.coach),
+          CoachPage(
+            isPremium: isPremium,
+            homeTipFuture: homeTipFuture,
+            onUpgradePressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MySubscriptionsPage(bloc: _paymentBloc),
+                ),
+              );
+            },
+          ),
         ];
 
         return Scaffold(
@@ -134,6 +229,13 @@ class _IoTShellPageState extends State<IoTShellPage> {
                         onSelected: (value) {
                           if (value == 'logout') {
                             widget.onLogout();
+                          } else if (value == 'subscriptions') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MySubscriptionsPage(bloc: _paymentBloc),
+                              ),
+                            );
                           }
                         },
                         itemBuilder: (context) => [
@@ -159,6 +261,45 @@ class _IoTShellPageState extends State<IoTShellPage> {
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                   ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem<String>(
+                            value: 'subscriptions',
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.payments_outlined,
+                                  color: AppTheme.brandGreen,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Mis Suscripciones'),
+                                const Spacer(),
+                                FutureBuilder<bool>(
+                                  future: _paymentBloc.repository.checkActiveSubscription(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && snapshot.data == true) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.brandGreen,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Text(
+                                          'PREMIUM',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
                                 ),
                               ],
                             ),
@@ -197,8 +338,7 @@ class _IoTShellPageState extends State<IoTShellPage> {
                                 child: Text(
                                   widget.session.username.isEmpty
                                       ? 'U'
-                                      : widget.session.username[0]
-                                            .toUpperCase(),
+                                      : widget.session.username[0].toUpperCase(),
                                   style: const TextStyle(
                                     color: AppTheme.brandGreen,
                                     fontWeight: FontWeight.w700,
@@ -228,6 +368,38 @@ class _IoTShellPageState extends State<IoTShellPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCommunicationsShell(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('JameoFit', style: TextStyle(color: AppTheme.ink, fontSize: 22, fontWeight: FontWeight.w800)),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) { if (value == 'logout') widget.onLogout(); },
+                    itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Cerrar sesión'))],
+                    child: CircleAvatar(
+                      backgroundColor: const Color(0xFFEAF8EE),
+                      child: Text(widget.session.username.isEmpty ? 'U' : widget.session.username[0].toUpperCase(), style: const TextStyle(color: AppTheme.brandGreen)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: CommunicationsPage(controller: widget.chatController)),
+            _BottomNav(index: _index, onChanged: (index) => setState(() => _index = index)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -260,7 +432,7 @@ class _DashboardPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ...overview.linkedDevices.map(
-                (device) => DeviceCard(
+                    (device) => DeviceCard(
                   device: device,
                   onTap: () {
                     if (device.name.contains('Bebedor')) {
@@ -276,7 +448,7 @@ class _DashboardPage extends StatelessWidget {
                 children: [
                   SummaryCard(
                     value:
-                        '${overview.dailySummary.waterLiters.toStringAsFixed(1)}L',
+                    '${overview.dailySummary.waterLiters.toStringAsFixed(1)}L',
                     label: 'Agua',
                     accent: AppTheme.skyBlue,
                   ),
@@ -400,7 +572,7 @@ class _HydrationPage extends StatelessWidget {
                 ),
                 const SectionTitle('REGISTROS AUTOMÁTICOS DE HOY'),
                 ...hydration.records.map(
-                  (record) => TimelineEntryTile(
+                      (record) => TimelineEntryTile(
                     time: record.time,
                     title: record.title,
                     subtitle: record.subtitle,
@@ -514,56 +686,6 @@ class _ScalePage extends StatelessWidget {
   }
 }
 
-class _CoachPage extends StatelessWidget {
-  const _CoachPage({required this.conversation});
-
-  final CoachConversation conversation;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        ScreenHeader(
-          title: 'Coach Nutricional IA',
-          subtitle: 'Basado en tus datos IoT',
-          tag: conversation.status,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-          child: Column(
-            children: [
-              ...conversation.messages.map(
-                (message) => MessageBubble(message: message),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: const Color(0xFFEBEBEB)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const CircleAvatar(
-                    radius: 17,
-                    backgroundColor: AppTheme.brandGreen,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _AlertsPage extends StatelessWidget {
   const _AlertsPage({required this.alertCenter});
 
@@ -640,7 +762,7 @@ class _AlertsPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 const SectionTitle('CONFIGURAR ALERTAS IOT'),
                 ...alertCenter.toggles.map(
-                  (toggle) =>
+                      (toggle) =>
                       ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
               ],
@@ -672,7 +794,7 @@ class _SettingsPage extends StatelessWidget {
               children: [
                 const SectionTitle('BEBEDOR INTELIGENTE'),
                 ...settings.deviceToggles.map(
-                  (toggle) =>
+                      (toggle) =>
                       ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
                 SettingTagRow(
@@ -681,7 +803,7 @@ class _SettingsPage extends StatelessWidget {
                 ),
                 const SectionTitle('BALANZA INTELIGENTE'),
                 ...settings.scaleToggles.map(
-                  (toggle) =>
+                      (toggle) =>
                       ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
                 SettingTagRow(
@@ -747,7 +869,7 @@ class _HistoryPage extends StatelessWidget {
               const SizedBox(height: 10),
               SectionTitle(history.todayLabel),
               ...history.todayEntries.map(
-                (entry) => TimelineEntryTile(
+                    (entry) => TimelineEntryTile(
                   time: entry.time,
                   title: entry.title,
                   subtitle: entry.subtitle,
@@ -758,7 +880,7 @@ class _HistoryPage extends StatelessWidget {
               const SizedBox(height: 6),
               SectionTitle(history.yesterdayLabel),
               ...history.yesterdayEntries.map(
-                (entry) => TimelineEntryTile(
+                    (entry) => TimelineEntryTile(
                   time: entry.time,
                   title: entry.title,
                   subtitle: entry.subtitle,
@@ -1142,7 +1264,7 @@ class _UserSummaryPage extends StatelessWidget {
               ),
               const SectionTitle('MACROS DE HOY'),
               ...summary.macros.map(
-                (macro) => _MacroProgressCard(macro: macro),
+                    (macro) => _MacroProgressCard(macro: macro),
               ),
               const SectionTitle('DATOS CLAVE'),
               Row(
@@ -1346,9 +1468,20 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <String>['Inicio', 'Historial', 'IoT', 'Coach IA'];
+    const items = <_NavigationItem>[
+      _NavigationItem('Inicio', Icons.home_rounded, Icons.home_outlined),
+      _NavigationItem(
+        'Citas',
+        Icons.calendar_month_rounded,
+        Icons.calendar_month_outlined,
+      ),
+      _NavigationItem('Historial', Icons.history_rounded, Icons.history_outlined),
+      _NavigationItem('IoT', Icons.devices_other_rounded, Icons.devices_other_outlined),
+      _NavigationItem('Coach IA', Icons.auto_awesome_rounded, Icons.auto_awesome_outlined),
+      _NavigationItem('Chat', Icons.forum_rounded, Icons.forum_outlined),
+    ];
     return Container(
-      height: 56,
+      height: 68,
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFE7E7E7))),
         color: Colors.white,
@@ -1357,18 +1490,56 @@ class _BottomNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(items.length, (itemIndex) {
           final selected = itemIndex == index;
+          final item = items[itemIndex];
           return Expanded(
-            child: InkWell(
-              onTap: () => onChanged(itemIndex),
-              child: Center(
-                child: Text(
-                  items[itemIndex],
-                  style: TextStyle(
-                    color: selected
-                        ? AppTheme.brandGreen
-                        : const Color(0xFFC8C1BB),
-                    fontSize: 14,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            child: Semantics(
+              button: true,
+              selected: selected,
+              label: item.label,
+              child: InkWell(
+                onTap: () => onChanged(itemIndex),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppTheme.softGreen
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Icon(
+                          selected ? item.selectedIcon : item.icon,
+                          size: 21,
+                          color: selected
+                              ? AppTheme.brandGreen
+                              : const Color(0xFF8A96A8),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selected
+                              ? AppTheme.brandGreen
+                              : const Color(0xFF8A96A8),
+                          fontSize: 10,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1378,4 +1549,12 @@ class _BottomNav extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NavigationItem {
+  const _NavigationItem(this.label, this.selectedIcon, this.icon);
+
+  final String label;
+  final IconData selectedIcon;
+  final IconData icon;
 }

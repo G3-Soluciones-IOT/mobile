@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:jameofit/app/theme/app_theme.dart';
 import 'package:jameofit/features/auth/data/auth_data_source.dart';
+import 'package:jameofit/features/chat/presentation/chat_controller.dart';
+import 'package:jameofit/features/chat/presentation/pages/communications_page.dart';
 import 'package:jameofit/features/iot/domain/entities/iot_entities.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
@@ -13,11 +15,13 @@ class IoTShellPage extends StatefulWidget {
     required this.bloc,
     required this.session,
     required this.onLogout,
+    required this.chatController,
   });
 
   final IoTBloc bloc;
   final AuthSession session;
   final VoidCallback onLogout;
+  final ChatController chatController;
 
   @override
   State<IoTShellPage> createState() => _IoTShellPageState();
@@ -28,6 +32,7 @@ class _IoTShellPageState extends State<IoTShellPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_index == 4) return _buildCommunicationsShell(context);
     return StreamBuilder<IoTState>(
       stream: widget.bloc.stream,
       initialData: widget.bloc.state,
@@ -35,10 +40,20 @@ class _IoTShellPageState extends State<IoTShellPage> {
         final state = snapshot.data ?? const IoTInitial();
 
         if (state is IoTInitial || state is IoTLoading) {
-          return const Scaffold(
+          return Scaffold(
             backgroundColor: Color(0xFFF2F3EE),
             body: Center(
-              child: CircularProgressIndicator(color: AppTheme.brandGreen),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: AppTheme.brandGreen),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => setState(() => _index = 4),
+                    child: const Text('Abrir Comunicaciones'),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -63,6 +78,11 @@ class _IoTShellPageState extends State<IoTShellPage> {
                         widget.bloc.add(const IoTOverviewRequested());
                       },
                       child: const Text('Reintentar'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => setState(() => _index = 4),
+                      child: const Text('Abrir Comunicaciones'),
                     ),
                   ],
                 ),
@@ -228,6 +248,38 @@ class _IoTShellPageState extends State<IoTShellPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCommunicationsShell(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('JameoFit', style: TextStyle(color: AppTheme.ink, fontSize: 22, fontWeight: FontWeight.w800)),
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) { if (value == 'logout') widget.onLogout(); },
+                    itemBuilder: (_) => const [PopupMenuItem(value: 'logout', child: Text('Cerrar sesión'))],
+                    child: CircleAvatar(
+                      backgroundColor: const Color(0xFFEAF8EE),
+                      child: Text(widget.session.username.isEmpty ? 'U' : widget.session.username[0].toUpperCase(), style: const TextStyle(color: AppTheme.brandGreen)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: CommunicationsPage(controller: widget.chatController)),
+            _BottomNav(index: _index, onChanged: (index) => setState(() => _index = index)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1346,7 +1398,7 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <String>['Inicio', 'Historial', 'IoT', 'Coach IA'];
+    final items = <String>['Inicio', 'Historial', 'IoT', 'Coach IA', 'Comunicaciones'];
     return Container(
       height: 56,
       decoration: const BoxDecoration(

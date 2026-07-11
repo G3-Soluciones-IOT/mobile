@@ -4,6 +4,10 @@ import 'package:jameofit/features/auth/data/auth_data_source.dart';
 import 'package:jameofit/features/auth/data/profile_onboarding_data_source.dart';
 import 'package:jameofit/features/auth/presentation/pages/login_page.dart';
 import 'package:jameofit/features/auth/presentation/pages/profile_onboarding_page.dart';
+import 'package:jameofit/features/chat/data/datasources/chat_data_source.dart';
+import 'package:jameofit/features/chat/data/repositories/chat_repository_impl.dart';
+import 'package:jameofit/features/chat/data/stomp_chat_client.dart';
+import 'package:jameofit/features/chat/presentation/chat_controller.dart';
 import 'package:jameofit/features/iot/data/datasources/remote_iot_data_source.dart';
 import 'package:jameofit/features/iot/data/repositories/iot_repository_impl.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
@@ -20,6 +24,7 @@ class JameoFitApp extends StatefulWidget {
 class _JameoFitAppState extends State<JameoFitApp> {
   final _authDataSource = const AuthDataSource();
   IoTBloc? _iotBloc;
+  ChatController? _chatController;
   AuthSession? _session;
   bool _isAuthenticating = false;
   String? _authError;
@@ -38,9 +43,21 @@ class _JameoFitAppState extends State<JameoFitApp> {
     )..add(const IoTOverviewRequested());
   }
 
+  ChatController _createChatController(AuthSession session) {
+    return ChatController(
+      session: session,
+      repository: ChatRepositoryImpl(
+        dataSource: ChatDataSource(authToken: session.token),
+      ),
+      transport: StompChatClient(),
+      onUnauthorized: _logout,
+    );
+  }
+
   @override
   void dispose() {
     _iotBloc?.close();
+    _chatController?.close();
     super.dispose();
   }
 
@@ -124,22 +141,26 @@ class _JameoFitAppState extends State<JameoFitApp> {
     final pendingOnboarding =
         await onboardingDataSource.fetchPendingOnboarding();
     _iotBloc?.close();
+    _chatController?.close();
 
     if (pendingOnboarding != null) {
       setState(() {
         _session = session;
         _pendingOnboarding = pendingOnboarding;
         _iotBloc = null;
+        _chatController = null;
         _onboardingError = null;
       });
       return;
     }
 
     final bloc = _createIoTBloc(session);
+    final chatController = _createChatController(session);
     setState(() {
       _session = session;
       _pendingOnboarding = null;
       _iotBloc = bloc;
+      _chatController = chatController;
       _onboardingError = null;
     });
   }
@@ -162,10 +183,13 @@ class _JameoFitAppState extends State<JameoFitApp> {
       );
       await onboardingDataSource.saveOnboarding(submission);
       _iotBloc?.close();
+      _chatController?.close();
       final bloc = _createIoTBloc(session);
+      final chatController = _createChatController(session);
       setState(() {
         _pendingOnboarding = null;
         _iotBloc = bloc;
+        _chatController = chatController;
       });
     } on ProfileOnboardingException catch (error) {
       setState(() {
@@ -186,8 +210,10 @@ class _JameoFitAppState extends State<JameoFitApp> {
 
   void _logout() {
     _iotBloc?.close();
+    _chatController?.close();
     setState(() {
       _iotBloc = null;
+      _chatController = null;
       _session = null;
       _authError = null;
       _pendingOnboarding = null;
@@ -228,6 +254,7 @@ class _JameoFitAppState extends State<JameoFitApp> {
           : _iotBloc != null
           ? IoTShellPage(
               bloc: _iotBloc!,
+              chatController: _chatController!,
               session: _session!,
               onLogout: _logout,
             )

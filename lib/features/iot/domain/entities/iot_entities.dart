@@ -303,3 +303,21 @@ class SetupStep {
   final bool isDone;
   final bool isActive;
 }
+
+class RegisteredIoTDevice {
+  const RegisteredIoTDevice({
+    required this.deviceId,
+    required this.userId,
+    required this.deviceType,
+    required this.apiKey,
+    required this.status,
+    required this.registeredAt,
+  });
+
+  final String deviceId;
+  final int userId;
+  final String deviceType;
+  final String apiKey;
+  final String status;
+  final String registeredAt;
+}

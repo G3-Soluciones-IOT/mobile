@@ -50,6 +50,7 @@ class MicroserviceEndpoints {
   static String get activityLevels => '$profilesBaseUrl/activity-levels';
   static String get signIn => '$authenticationBaseUrl/sign-in';
   static String get signUp => '$authenticationBaseUrl/sign-up';
+  static String get iotDevices => '$iotBaseUrl/iot/devices';
   static String get iotDevicesByUser => '$iotBaseUrl/iot/devices/{userId}';
   static String get iotHydrationByUser => '$iotBaseUrl/iot/hydration/{userId}';
   static String get iotHydrationSummary =>

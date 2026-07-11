@@ -1,6 +1,18 @@
 import 'package:flutter/foundation.dart';
 
 class MicroserviceEndpoints {
+  static const _remoteGatewayBaseUrl = String.fromEnvironment(
+    'JAMEOFIT_API_BASE_URL',
+    defaultValue: 'https://jameofit.duckdns.org',
+  );
+  static const _useLocalGateway = bool.fromEnvironment(
+    'JAMEOFIT_USE_LOCAL_GATEWAY',
+    defaultValue: false,
+  );
+
+  static String get gatewayBaseUrl =>
+      _useLocalGateway ? 'http://$_host:8080' : _remoteGatewayBaseUrl;
+
   static String get _host {
     if (kIsWeb) return 'localhost';
     switch (defaultTargetPlatform) {
@@ -11,15 +23,32 @@ class MicroserviceEndpoints {
     }
   }
 
-  static String get profilesBaseUrl => 'http://$_host:8082/api/v1';
-  static String get goalsBaseUrl => 'http://$_host:8083/api/v1';
-  static String get mealPlansBaseUrl => 'http://$_host:8084/api/v1';
-  static String get trackingBaseUrl => 'http://$_host:8085/api/v1';
+  static String get profilesBaseUrl => '$gatewayBaseUrl/api/v1';
+  static String get goalsBaseUrl => '$gatewayBaseUrl/api/v1';
+  static String get mealPlansBaseUrl => '$gatewayBaseUrl/api/v1';
+  static String get trackingBaseUrl => '$gatewayBaseUrl/api/v1';
+  static String get iotBaseUrl => '$gatewayBaseUrl/api/v1';
+  static String get authenticationBaseUrl =>
+      '$gatewayBaseUrl/api/v1/authentication';
 
   static String get trackingByUser => '$trackingBaseUrl/tracking/user/{userId}';
-  static String get trackingProgress => '$trackingBaseUrl/tracking/user/{userId}/progress';
-  static String get trackingGoalByUser => '$trackingBaseUrl/tracking-goals/user/{userId}';
-  static String get mealPlansByProfile => '$mealPlansBaseUrl/meal-plan/profile/{profileId}';
+  static String get trackingProgress =>
+      '$trackingBaseUrl/tracking/user/{userId}/progress';
+  static String get trackingGoalByUser =>
+      '$trackingBaseUrl/tracking-goals/user/{userId}';
+  static String get mealPlansByProfile =>
+      '$mealPlansBaseUrl/meal-plan/profile/{profileId}';
   static String get goals => '$goalsBaseUrl/goals';
   static String get profiles => '$profilesBaseUrl/profiles';
+  static String get userProfileByUser =>
+      '$profilesBaseUrl/user-profiles/by-user/{userId}';
+  static String get signIn => '$authenticationBaseUrl/sign-in';
+  static String get signUp => '$authenticationBaseUrl/sign-up';
+  static String get iotDevicesByUser => '$iotBaseUrl/iot/devices/{userId}';
+  static String get iotHydrationByUser => '$iotBaseUrl/iot/hydration/{userId}';
+  static String get iotHydrationSummary =>
+      '$iotBaseUrl/iot/hydration/{userId}/summary';
+  static String get iotWeightHistory =>
+      '$iotBaseUrl/iot/weight/{userId}/history';
+  static String get iotLatestWeight => '$iotBaseUrl/iot/weight/{userId}/latest';
 }

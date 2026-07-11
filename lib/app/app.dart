@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:jameofit/app/theme/app_theme.dart';
-import 'package:jameofit/features/iot/data/datasources/mock_iot_data_source.dart';
+import 'package:jameofit/features/auth/data/auth_data_source.dart';
+import 'package:jameofit/features/auth/presentation/pages/login_page.dart';
+import 'package:jameofit/features/iot/data/datasources/remote_iot_data_source.dart';
 import 'package:jameofit/features/iot/data/repositories/iot_repository_impl.dart';
-import 'package:jameofit/features/iot/presentation/controllers/iot_controller.dart';
+import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
+import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
 import 'package:jameofit/features/iot/presentation/pages/iot_shell_page.dart';
 
 class JameoFitApp extends StatefulWidget {
@@ -13,22 +16,111 @@ class JameoFitApp extends StatefulWidget {
 }
 
 class _JameoFitAppState extends State<JameoFitApp> {
-  late final IoTController _controller;
+  final _authDataSource = const AuthDataSource();
+  IoTBloc? _iotBloc;
+  AuthSession? _session;
+  bool _isAuthenticating = false;
+  String? _authError;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = IoTController(
+  IoTBloc _createIoTBloc(AuthSession session) {
+    return IoTBloc(
       repository: IoTRepositoryImpl(
-        dataSource: MockIoTDataSource(),
+        dataSource: RemoteIoTDataSource(
+          userId: session.userId,
+          username: session.username,
+          authToken: session.token,
+        ),
       ),
-    )..load();
+    )..add(const IoTOverviewRequested());
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _iotBloc?.close();
     super.dispose();
+  }
+
+  Future<void> _signIn({
+    required String username,
+    required String password,
+  }) async {
+    setState(() {
+      _isAuthenticating = true;
+      _authError = null;
+    });
+
+    try {
+      final session = await _authDataSource.signIn(
+        username: username,
+        password: password,
+      );
+      _iotBloc?.close();
+      final bloc = _createIoTBloc(session);
+      setState(() {
+        _session = session;
+        _iotBloc = bloc;
+      });
+    } on AuthException catch (error) {
+      setState(() {
+        _authError = error.message;
+      });
+    } catch (_) {
+      setState(() {
+        _authError = 'No se pudo iniciar sesion en este momento.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAuthenticating = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signUp({
+    required String username,
+    required String password,
+  }) async {
+    setState(() {
+      _isAuthenticating = true;
+      _authError = null;
+    });
+
+    try {
+      final session = await _authDataSource.signUp(
+        username: username,
+        password: password,
+      );
+      _iotBloc?.close();
+      final bloc = _createIoTBloc(session);
+      setState(() {
+        _session = session;
+        _iotBloc = bloc;
+      });
+    } on AuthException catch (error) {
+      setState(() {
+        _authError = error.message;
+      });
+    } catch (_) {
+      setState(() {
+        _authError = 'No se pudo crear la cuenta en este momento.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAuthenticating = false;
+        });
+      }
+    }
+  }
+
+  void _logout() {
+    _iotBloc?.close();
+    setState(() {
+      _iotBloc = null;
+      _session = null;
+      _authError = null;
+    });
   }
 
   @override
@@ -46,7 +138,18 @@ class _JameoFitAppState extends State<JameoFitApp> {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: IoTShellPage(controller: _controller),
+      home: _session == null || _iotBloc == null
+          ? LoginPage(
+              isLoading: _isAuthenticating,
+              errorMessage: _authError,
+              onSignIn: _signIn,
+              onSignUp: _signUp,
+            )
+          : IoTShellPage(
+              bloc: _iotBloc!,
+              session: _session!,
+              onLogout: _logout,
+            ),
     );
   }
 }

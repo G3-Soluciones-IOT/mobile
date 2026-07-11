@@ -30,6 +30,11 @@ class MicroserviceEndpoints {
   static String get iotBaseUrl => '$gatewayBaseUrl/api/v1';
   static String get authenticationBaseUrl =>
       '$gatewayBaseUrl/api/v1/authentication';
+  static String get chatBaseUrl => '$gatewayBaseUrl/api/v1/chat';
+  static String get chatWebSocketUrl {
+    final uri = Uri.parse(gatewayBaseUrl);
+    return uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws', path: '/ws').toString();
+  }
   static String get paymentsBaseUrl => '$gatewayBaseUrl/api/v1';
   static String get aiBaseUrl => '$gatewayBaseUrl/api/v1/ai';
   static String get nutritionistBaseUrl => '$gatewayBaseUrl/api/v1';
@@ -61,6 +66,9 @@ class MicroserviceEndpoints {
   static String get iotWeightHistory =>
       '$iotBaseUrl/iot/weight/{userId}/history';
   static String get iotLatestWeight => '$iotBaseUrl/iot/weight/{userId}/latest';
+  static String get chatContacts => '$chatBaseUrl/me/contacts';
+  static String get chatConversationMessages =>
+      '$chatBaseUrl/conversations/{contactUserId}/messages';
 
   static String get subscriptions => '$paymentsBaseUrl/subscriptions';
   static String get subscriptionCancel =>

@@ -8,6 +8,17 @@ import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_state.dart';
 import 'package:jameofit/features/iot/presentation/widgets/iot_widgets.dart';
+import 'package:jameofit/features/payments/data/datasources/payment_data_source.dart';
+import 'package:jameofit/features/payments/data/repositories/payment_repository_impl.dart';
+import 'package:jameofit/features/payments/presentation/bloc/payment_bloc.dart';
+import 'package:jameofit/features/payments/presentation/bloc/payment_state.dart';
+import 'package:jameofit/features/payments/presentation/pages/my_subscriptions_page.dart';
+import 'package:jameofit/features/coach/data/datasources/coach_data_source.dart';
+import 'package:jameofit/features/coach/presentation/pages/coach_page.dart';
+import 'package:jameofit/features/appointments/presentation/pages/appointments_page.dart';
+import 'package:jameofit/features/appointments/data/datasources/appointment_data_source.dart';
+import 'package:jameofit/features/appointments/data/repositories/appointment_repository_impl.dart';
+import 'package:jameofit/features/appointments/domain/repositories/appointment_repository.dart';
 
 class IoTShellPage extends StatefulWidget {
   const IoTShellPage({
@@ -28,7 +39,39 @@ class IoTShellPage extends StatefulWidget {
 }
 
 class _IoTShellPageState extends State<IoTShellPage> {
-  int _index = 2;
+  int _index = 0;
+  late PaymentBloc _paymentBloc;
+  late AppointmentRepository _appointmentRepository;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPaymentBloc();
+    _initAppointmentRepository();
+  }
+
+  void _initAppointmentRepository() {
+    final dataSource = AppointmentDataSource(
+      userId: widget.session.userId,
+      authToken: widget.session.token,
+    );
+    _appointmentRepository = AppointmentRepositoryImpl(dataSource: dataSource);
+  }
+
+  void _initPaymentBloc() {
+    final dataSource = PaymentDataSource(
+      userId: widget.session.userId,
+      authToken: widget.session.token,
+    );
+    final repository = PaymentRepositoryImpl(dataSource: dataSource);
+    _paymentBloc = PaymentBloc(repository: repository);
+  }
+
+  @override
+  void dispose() {
+    _paymentBloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,8 +135,27 @@ class _IoTShellPageState extends State<IoTShellPage> {
         }
 
         final overview = (state as IoTLoaded).overview;
+
+        bool isPremium = false;
+
+        final paymentState = _paymentBloc.state;
+        if (paymentState is PaymentLoaded) {
+          isPremium = paymentState.isPremium;
+        }
+
+        final coachDataSource = CoachDataSource(
+          userId: widget.session.userId,
+          authToken: widget.session.token,
+        );
+
+        final homeTipFuture = coachDataSource.getHomeTip();
+
         final pages = [
           _UserSummaryPage(summary: overview.userSummary),
+          AppointmentsPage(
+            repository: _appointmentRepository,
+            userId: widget.session.userId,
+          ),
           _HistoryPage(history: overview.history),
           _DashboardPage(
             overview: overview,
@@ -105,7 +167,18 @@ class _IoTShellPageState extends State<IoTShellPage> {
               ).push(MaterialPageRoute(builder: (_) => page));
             },
           ),
-          _CoachPage(conversation: overview.coach),
+          CoachPage(
+            isPremium: isPremium,
+            homeTipFuture: homeTipFuture,
+            onUpgradePressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MySubscriptionsPage(bloc: _paymentBloc),
+                ),
+              );
+            },
+          ),
         ];
 
         return Scaffold(
@@ -154,6 +227,13 @@ class _IoTShellPageState extends State<IoTShellPage> {
                         onSelected: (value) {
                           if (value == 'logout') {
                             widget.onLogout();
+                          } else if (value == 'subscriptions') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => MySubscriptionsPage(bloc: _paymentBloc),
+                              ),
+                            );
                           }
                         },
                         itemBuilder: (context) => [
@@ -179,6 +259,45 @@ class _IoTShellPageState extends State<IoTShellPage> {
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                   ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem<String>(
+                            value: 'subscriptions',
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.payments_outlined,
+                                  color: AppTheme.brandGreen,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('Mis Suscripciones'),
+                                const Spacer(),
+                                FutureBuilder<bool>(
+                                  future: _paymentBloc.repository.checkActiveSubscription(),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && snapshot.data == true) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.brandGreen,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Text(
+                                          'PREMIUM',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
                                 ),
                               ],
                             ),
@@ -217,8 +336,7 @@ class _IoTShellPageState extends State<IoTShellPage> {
                                 child: Text(
                                   widget.session.username.isEmpty
                                       ? 'U'
-                                      : widget.session.username[0]
-                                            .toUpperCase(),
+                                      : widget.session.username[0].toUpperCase(),
                                   style: const TextStyle(
                                     color: AppTheme.brandGreen,
                                     fontWeight: FontWeight.w700,
@@ -312,7 +430,7 @@ class _DashboardPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ...overview.linkedDevices.map(
-                (device) => DeviceCard(
+                    (device) => DeviceCard(
                   device: device,
                   onTap: () {
                     if (device.name.contains('Bebedor')) {
@@ -328,7 +446,7 @@ class _DashboardPage extends StatelessWidget {
                 children: [
                   SummaryCard(
                     value:
-                        '${overview.dailySummary.waterLiters.toStringAsFixed(1)}L',
+                    '${overview.dailySummary.waterLiters.toStringAsFixed(1)}L',
                     label: 'Agua',
                     accent: AppTheme.skyBlue,
                   ),
@@ -452,7 +570,7 @@ class _HydrationPage extends StatelessWidget {
                 ),
                 const SectionTitle('REGISTROS AUTOMÁTICOS DE HOY'),
                 ...hydration.records.map(
-                  (record) => TimelineEntryTile(
+                      (record) => TimelineEntryTile(
                     time: record.time,
                     title: record.title,
                     subtitle: record.subtitle,
@@ -566,56 +684,6 @@ class _ScalePage extends StatelessWidget {
   }
 }
 
-class _CoachPage extends StatelessWidget {
-  const _CoachPage({required this.conversation});
-
-  final CoachConversation conversation;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        ScreenHeader(
-          title: 'Coach Nutricional IA',
-          subtitle: 'Basado en tus datos IoT',
-          tag: conversation.status,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-          child: Column(
-            children: [
-              ...conversation.messages.map(
-                (message) => MessageBubble(message: message),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: const Color(0xFFEBEBEB)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  const CircleAvatar(
-                    radius: 17,
-                    backgroundColor: AppTheme.brandGreen,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _AlertsPage extends StatelessWidget {
   const _AlertsPage({required this.alertCenter});
 
@@ -692,7 +760,7 @@ class _AlertsPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 const SectionTitle('CONFIGURAR ALERTAS IOT'),
                 ...alertCenter.toggles.map(
-                  (toggle) =>
+                      (toggle) =>
                       ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
               ],
@@ -724,7 +792,7 @@ class _SettingsPage extends StatelessWidget {
               children: [
                 const SectionTitle('BEBEDOR INTELIGENTE'),
                 ...settings.deviceToggles.map(
-                  (toggle) =>
+                      (toggle) =>
                       ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
                 SettingTagRow(
@@ -733,7 +801,7 @@ class _SettingsPage extends StatelessWidget {
                 ),
                 const SectionTitle('BALANZA INTELIGENTE'),
                 ...settings.scaleToggles.map(
-                  (toggle) =>
+                      (toggle) =>
                       ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
                 SettingTagRow(
@@ -799,7 +867,7 @@ class _HistoryPage extends StatelessWidget {
               const SizedBox(height: 10),
               SectionTitle(history.todayLabel),
               ...history.todayEntries.map(
-                (entry) => TimelineEntryTile(
+                    (entry) => TimelineEntryTile(
                   time: entry.time,
                   title: entry.title,
                   subtitle: entry.subtitle,
@@ -810,7 +878,7 @@ class _HistoryPage extends StatelessWidget {
               const SizedBox(height: 6),
               SectionTitle(history.yesterdayLabel),
               ...history.yesterdayEntries.map(
-                (entry) => TimelineEntryTile(
+                    (entry) => TimelineEntryTile(
                   time: entry.time,
                   title: entry.title,
                   subtitle: entry.subtitle,
@@ -1194,7 +1262,7 @@ class _UserSummaryPage extends StatelessWidget {
               ),
               const SectionTitle('MACROS DE HOY'),
               ...summary.macros.map(
-                (macro) => _MacroProgressCard(macro: macro),
+                    (macro) => _MacroProgressCard(macro: macro),
               ),
               const SectionTitle('DATOS CLAVE'),
               Row(
@@ -1398,7 +1466,8 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <String>['Inicio', 'Historial', 'IoT', 'Coach IA', 'Comunicaciones'];
+
+    final items = <String>['Inicio', 'Citas', 'Historial', 'IoT', 'Coach IA', 'Chat'];
     return Container(
       height: 56,
       decoration: const BoxDecoration(

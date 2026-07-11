@@ -35,6 +35,9 @@ class MicroserviceEndpoints {
     final uri = Uri.parse(gatewayBaseUrl);
     return uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws', path: '/ws').toString();
   }
+  static String get paymentsBaseUrl => '$gatewayBaseUrl/api/v1';
+  static String get aiBaseUrl => '$gatewayBaseUrl/api/v1/ai';
+  static String get nutritionistBaseUrl => '$gatewayBaseUrl/api/v1';
 
   static String get trackingByUser => '$trackingBaseUrl/tracking/user/{userId}';
   static String get trackingProgress =>
@@ -66,4 +69,32 @@ class MicroserviceEndpoints {
   static String get chatContacts => '$chatBaseUrl/me/contacts';
   static String get chatConversationMessages =>
       '$chatBaseUrl/conversations/{contactUserId}/messages';
+
+  static String get subscriptions => '$paymentsBaseUrl/subscriptions';
+  static String get subscriptionCancel =>
+      '$paymentsBaseUrl/subscriptions/{subscriptionId}/cancel';
+  static String get subscriptionRenew =>
+      '$paymentsBaseUrl/subscriptions/{subscriptionId}/renew';
+  static String get subscriptionActive =>
+      '$paymentsBaseUrl/subscriptions/users/{userId}/active';
+  static String get invoices => '$paymentsBaseUrl/invoices/users/{userId}';
+  static String get premiumAccess =>
+      '$paymentsBaseUrl/internal/subscriptions/users/{userId}/premium-access';
+  static String get createPaymentIntent =>
+      '$paymentsBaseUrl/payments/create-intent';
+
+  static String get homeTip => '$aiBaseUrl/home-tip/{userId}';
+
+  static String get nutritionists => '$nutritionistBaseUrl/nutritionists';
+  static String get nutritionistsByUser =>
+      '$nutritionistBaseUrl/nutritionists/by-user?userId={userId}';
+  static String get nutritionistPatients =>
+      '$nutritionistBaseUrl/nutritionist-patients';
+  static String get nutritionistPatientsByPatient =>
+      '$nutritionistBaseUrl/nutritionist-patients/patient/{userId}';
+  static String get appointments => '$nutritionistBaseUrl/appointments';
+  static String get appointmentsMe => '$nutritionistBaseUrl/appointments/me';
+  static String get appointmentById =>
+      '$nutritionistBaseUrl/appointments/{id}';
+
 }

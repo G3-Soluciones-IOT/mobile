@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:jameofit/app/theme/app_theme.dart';
 import 'package:jameofit/features/auth/data/auth_data_source.dart';
+import 'package:jameofit/features/auth/data/profile_onboarding_data_source.dart';
 import 'package:jameofit/features/auth/presentation/pages/login_page.dart';
+import 'package:jameofit/features/auth/presentation/pages/profile_onboarding_page.dart';
 import 'package:jameofit/features/iot/data/datasources/remote_iot_data_source.dart';
 import 'package:jameofit/features/iot/data/repositories/iot_repository_impl.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
@@ -21,6 +23,8 @@ class _JameoFitAppState extends State<JameoFitApp> {
   AuthSession? _session;
   bool _isAuthenticating = false;
   String? _authError;
+  PendingOnboarding? _pendingOnboarding;
+  String? _onboardingError;
 
   IoTBloc _createIoTBloc(AuthSession session) {
     return IoTBloc(
@@ -54,13 +58,12 @@ class _JameoFitAppState extends State<JameoFitApp> {
         username: username,
         password: password,
       );
-      _iotBloc?.close();
-      final bloc = _createIoTBloc(session);
-      setState(() {
-        _session = session;
-        _iotBloc = bloc;
-      });
+      await _handleAuthenticatedSession(session);
     } on AuthException catch (error) {
+      setState(() {
+        _authError = error.message;
+      });
+    } on ProfileOnboardingException catch (error) {
       setState(() {
         _authError = error.message;
       });
@@ -91,13 +94,12 @@ class _JameoFitAppState extends State<JameoFitApp> {
         username: username,
         password: password,
       );
-      _iotBloc?.close();
-      final bloc = _createIoTBloc(session);
-      setState(() {
-        _session = session;
-        _iotBloc = bloc;
-      });
+      await _handleAuthenticatedSession(session);
     } on AuthException catch (error) {
+      setState(() {
+        _authError = error.message;
+      });
+    } on ProfileOnboardingException catch (error) {
       setState(() {
         _authError = error.message;
       });
@@ -114,12 +116,82 @@ class _JameoFitAppState extends State<JameoFitApp> {
     }
   }
 
+  Future<void> _handleAuthenticatedSession(AuthSession session) async {
+    final onboardingDataSource = ProfileOnboardingDataSource(
+      userId: session.userId,
+      authToken: session.token,
+    );
+    final pendingOnboarding =
+        await onboardingDataSource.fetchPendingOnboarding();
+    _iotBloc?.close();
+
+    if (pendingOnboarding != null) {
+      setState(() {
+        _session = session;
+        _pendingOnboarding = pendingOnboarding;
+        _iotBloc = null;
+        _onboardingError = null;
+      });
+      return;
+    }
+
+    final bloc = _createIoTBloc(session);
+    setState(() {
+      _session = session;
+      _pendingOnboarding = null;
+      _iotBloc = bloc;
+      _onboardingError = null;
+    });
+  }
+
+  Future<void> _completeOnboarding(
+    ProfileOnboardingSubmission submission,
+  ) async {
+    final session = _session;
+    if (session == null) return;
+
+    setState(() {
+      _isAuthenticating = true;
+      _onboardingError = null;
+    });
+
+    try {
+      final onboardingDataSource = ProfileOnboardingDataSource(
+        userId: session.userId,
+        authToken: session.token,
+      );
+      await onboardingDataSource.saveOnboarding(submission);
+      _iotBloc?.close();
+      final bloc = _createIoTBloc(session);
+      setState(() {
+        _pendingOnboarding = null;
+        _iotBloc = bloc;
+      });
+    } on ProfileOnboardingException catch (error) {
+      setState(() {
+        _onboardingError = error.message;
+      });
+    } catch (_) {
+      setState(() {
+        _onboardingError = 'No se pudo guardar tu perfil en este momento.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAuthenticating = false;
+        });
+      }
+    }
+  }
+
   void _logout() {
     _iotBloc?.close();
     setState(() {
       _iotBloc = null;
       _session = null;
       _authError = null;
+      _pendingOnboarding = null;
+      _onboardingError = null;
     });
   }
 
@@ -138,17 +210,29 @@ class _JameoFitAppState extends State<JameoFitApp> {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: _session == null || _iotBloc == null
+      home: _session == null
           ? LoginPage(
               isLoading: _isAuthenticating,
               errorMessage: _authError,
               onSignIn: _signIn,
               onSignUp: _signUp,
             )
-          : IoTShellPage(
+          : _pendingOnboarding != null
+          ? ProfileOnboardingPage(
+              username: _session!.username,
+              pendingOnboarding: _pendingOnboarding!,
+              isLoading: _isAuthenticating,
+              errorMessage: _onboardingError,
+              onSubmit: _completeOnboarding,
+            )
+          : _iotBloc != null
+          ? IoTShellPage(
               bloc: _iotBloc!,
               session: _session!,
               onLogout: _logout,
+            )
+          : const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
             ),
     );
   }

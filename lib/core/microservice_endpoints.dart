@@ -39,9 +39,15 @@ class MicroserviceEndpoints {
   static String get mealPlansByProfile =>
       '$mealPlansBaseUrl/meal-plan/profile/{profileId}';
   static String get goals => '$goalsBaseUrl/goals';
+  static String get goalCalories => '$goalsBaseUrl/goals/calories';
+  static String get goalDietType => '$goalsBaseUrl/goals/diet-type';
   static String get profiles => '$profilesBaseUrl/profiles';
   static String get userProfileByUser =>
       '$profilesBaseUrl/user-profiles/by-user/{userId}';
+  static String get userProfiles => '$profilesBaseUrl/user-profiles';
+  static String get objectives => '$profilesBaseUrl/objectives';
+  static String get allergies => '$profilesBaseUrl/allergies';
+  static String get activityLevels => '$profilesBaseUrl/activity-levels';
   static String get signIn => '$authenticationBaseUrl/sign-in';
   static String get signUp => '$authenticationBaseUrl/sign-up';
   static String get iotDevicesByUser => '$iotBaseUrl/iot/devices/{userId}';

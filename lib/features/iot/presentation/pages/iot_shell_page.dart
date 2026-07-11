@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:jameofit/app/theme/app_theme.dart';
+import 'package:jameofit/features/auth/data/auth_data_source.dart';
 import 'package:jameofit/features/iot/domain/entities/iot_entities.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_bloc.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
@@ -7,9 +8,16 @@ import 'package:jameofit/features/iot/presentation/bloc/iot_state.dart';
 import 'package:jameofit/features/iot/presentation/widgets/iot_widgets.dart';
 
 class IoTShellPage extends StatefulWidget {
-  const IoTShellPage({super.key, required this.bloc});
+  const IoTShellPage({
+    super.key,
+    required this.bloc,
+    required this.session,
+    required this.onLogout,
+  });
 
   final IoTBloc bloc;
+  final AuthSession session;
+  final VoidCallback onLogout;
 
   @override
   State<IoTShellPage> createState() => _IoTShellPageState();
@@ -70,54 +78,74 @@ class _IoTShellPageState extends State<IoTShellPage> {
           _DashboardPage(
             overview: overview,
             openPage: (page) {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => page));
             },
           ),
           _CoachPage(conversation: overview.coach),
         ];
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF1F2EC),
+          backgroundColor: Colors.white,
           body: SafeArea(
-            child: Center(
-              child: Container(
-                width: 360,
-                height: 730,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(36),
-                  border: Border.all(color: const Color(0xFFD9D9D9), width: 3),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 28,
-                      offset: Offset(0, 18),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(32),
-                  child: Column(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
                     children: [
-                      const SizedBox(height: 14),
-                      Container(
-                        width: 88,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF262626),
-                          borderRadius: BorderRadius.circular(999),
+                      const Expanded(
+                        child: Text(
+                          'JameoFit',
+                          style: TextStyle(
+                            color: AppTheme.ink,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 10),
-                      Expanded(child: pages[_index]),
-                      _BottomNav(
-                        index: _index,
-                        onChanged: (index) => setState(() => _index = index),
+                      PopupMenuButton<String>(
+                        tooltip: 'Sesion',
+                        onSelected: (value) {
+                          if (value == 'logout') {
+                            widget.onLogout();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem<String>(
+                            enabled: false,
+                            value: 'session',
+                            child: Text(widget.session.username),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'logout',
+                            child: Text('Cerrar sesion'),
+                          ),
+                        ],
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: const Color(0xFFE6F6EA),
+                          child: Text(
+                            widget.session.username.isEmpty
+                                ? 'U'
+                                : widget.session.username[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: AppTheme.brandGreen,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
+                Expanded(child: pages[_index]),
+                _BottomNav(
+                  index: _index,
+                  onChanged: (index) => setState(() => _index = index),
+                ),
+              ],
             ),
           ),
         );
@@ -127,10 +155,7 @@ class _IoTShellPageState extends State<IoTShellPage> {
 }
 
 class _DashboardPage extends StatelessWidget {
-  const _DashboardPage({
-    required this.overview,
-    required this.openPage,
-  });
+  const _DashboardPage({required this.overview, required this.openPage});
 
   final IoTOverview overview;
   final void Function(Widget page) openPage;
@@ -165,7 +190,8 @@ class _DashboardPage extends StatelessWidget {
               Row(
                 children: [
                   SummaryCard(
-                    value: '${overview.dailySummary.waterLiters.toStringAsFixed(1)}L',
+                    value:
+                        '${overview.dailySummary.waterLiters.toStringAsFixed(1)}L',
                     label: 'Agua',
                     accent: AppTheme.skyBlue,
                   ),
@@ -200,7 +226,8 @@ class _DashboardPage extends StatelessWidget {
               const SizedBox(height: 14),
               PrimaryAction(
                 label: '+ Agregar dispositivo',
-                onPressed: () => openPage(_LinkDevicePage(setup: overview.setup)),
+                onPressed: () =>
+                    openPage(_LinkDevicePage(setup: overview.setup)),
               ),
             ],
           ),
@@ -336,7 +363,10 @@ class _ScalePage extends StatelessWidget {
                   ],
                 ),
                 const SectionTitle('EVOLUCIÓN SEMANAL'),
-                LineChartCard(labels: weight.weekLabels, values: weight.weekValues),
+                LineChartCard(
+                  labels: weight.weekLabels,
+                  values: weight.weekValues,
+                ),
                 const SectionTitle('COMPOSICIÓN CORPORAL'),
                 ...weight.composition.map((item) {
                   final color = Color(item.accentHex);
@@ -411,7 +441,9 @@ class _CoachPage extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
           child: Column(
             children: [
-              ...conversation.messages.map((message) => MessageBubble(message: message)),
+              ...conversation.messages.map(
+                (message) => MessageBubble(message: message),
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -467,7 +499,9 @@ class _AlertsPage extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Color(0xFFEDEDED))),
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xFFEDEDED)),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -486,18 +520,26 @@ class _AlertsPage extends StatelessWidget {
                             children: [
                               Text(
                                 notification.title,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.titleMedium?.copyWith(fontSize: 14),
                               ),
                               Text(
                                 notification.subtitle,
-                                style: const TextStyle(color: AppTheme.muted, fontSize: 13),
+                                style: const TextStyle(
+                                  color: AppTheme.muted,
+                                  fontSize: 13,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         Text(
                           notification.timeLabel,
-                          style: TextStyle(color: accent, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: accent,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ],
                     ),
@@ -506,7 +548,8 @@ class _AlertsPage extends StatelessWidget {
                 const SizedBox(height: 12),
                 const SectionTitle('CONFIGURAR ALERTAS IOT'),
                 ...alertCenter.toggles.map(
-                  (toggle) => ToggleRow(label: toggle.label, value: toggle.enabled),
+                  (toggle) =>
+                      ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
               ],
             ),
@@ -529,10 +572,7 @@ class _SettingsPage extends StatelessWidget {
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const ScreenHeader(
-            title: 'Configuración IoT',
-            subtitle: '',
-          ),
+          const ScreenHeader(title: 'Configuración IoT', subtitle: ''),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
             child: Column(
@@ -540,7 +580,8 @@ class _SettingsPage extends StatelessWidget {
               children: [
                 const SectionTitle('BEBEDOR INTELIGENTE'),
                 ...settings.deviceToggles.map(
-                  (toggle) => ToggleRow(label: toggle.label, value: toggle.enabled),
+                  (toggle) =>
+                      ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
                 SettingTagRow(
                   label: 'Meta diaria de agua',
@@ -548,7 +589,8 @@ class _SettingsPage extends StatelessWidget {
                 ),
                 const SectionTitle('BALANZA INTELIGENTE'),
                 ...settings.scaleToggles.map(
-                  (toggle) => ToggleRow(label: toggle.label, value: toggle.enabled),
+                  (toggle) =>
+                      ToggleRow(label: toggle.label, value: toggle.enabled),
                 ),
                 SettingTagRow(
                   label: 'Frecuencia de alerta',
@@ -588,7 +630,10 @@ class _HistoryPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(999),
@@ -597,7 +642,11 @@ class _HistoryPage extends StatelessWidget {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.local_drink_outlined, color: AppTheme.brandGreen, size: 17),
+                    Icon(
+                      Icons.local_drink_outlined,
+                      color: AppTheme.brandGreen,
+                      size: 17,
+                    ),
                     SizedBox(width: 8),
                     Text('Filtrado: IoT'),
                   ],
@@ -645,10 +694,7 @@ class _LinkDevicePage extends StatelessWidget {
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const ScreenHeader(
-            title: 'Vincular dispositivo',
-            subtitle: '',
-          ),
+          const ScreenHeader(title: 'Vincular dispositivo', subtitle: ''),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
             child: Column(
@@ -700,10 +746,7 @@ class _SimpleHomePage extends StatelessWidget {
 }
 
 class _BottomNav extends StatelessWidget {
-  const _BottomNav({
-    required this.index,
-    required this.onChanged,
-  });
+  const _BottomNav({required this.index, required this.onChanged});
 
   final int index;
   final ValueChanged<int> onChanged;
@@ -728,7 +771,9 @@ class _BottomNav extends StatelessWidget {
                 child: Text(
                   items[itemIndex],
                   style: TextStyle(
-                    color: selected ? AppTheme.brandGreen : const Color(0xFFC8C1BB),
+                    color: selected
+                        ? AppTheme.brandGreen
+                        : const Color(0xFFC8C1BB),
                     fontSize: 14,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),

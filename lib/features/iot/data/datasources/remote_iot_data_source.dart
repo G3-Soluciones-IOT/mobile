@@ -11,6 +11,8 @@ class RemoteIoTDataSource {
     http.Client? client,
   }) : _client = client;
 
+  static const _requestTimeout = Duration(seconds: 15);
+
   final int userId;
   final String? authToken;
   final http.Client? _client;
@@ -63,8 +65,9 @@ class RemoteIoTDataSource {
       ..._historyEntriesFromHydration(hydrationRecords),
       if (latestWeight.isNotEmpty) _historyEntryFromWeight(latestWeight),
     ]..sort((a, b) => b.time.compareTo(a.time));
-    final yesterdayEntries =
-        _historyEntriesFromHydration(yesterdayHydrationRecords);
+    final yesterdayEntries = _historyEntriesFromHydration(
+      yesterdayHydrationRecords,
+    );
 
     return IoTOverview(
       userName: 'Usuario $userId',
@@ -104,18 +107,24 @@ class RemoteIoTDataSource {
   }
 
   String trackingByUserUrl(int userId) {
-    return MicroserviceEndpoints.trackingByUser
-        .replaceFirst('{userId}', '$userId');
+    return MicroserviceEndpoints.trackingByUser.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
   }
 
   String trackingProgressUrl(int userId) {
-    return MicroserviceEndpoints.trackingProgress
-        .replaceFirst('{userId}', '$userId');
+    return MicroserviceEndpoints.trackingProgress.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
   }
 
   String trackingGoalByUserUrl(int userId) {
-    return MicroserviceEndpoints.trackingGoalByUser
-        .replaceFirst('{userId}', '$userId');
+    return MicroserviceEndpoints.trackingGoalByUser.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
   }
 
   String mealPlanEntriesUrl(int trackingId) {
@@ -123,30 +132,40 @@ class RemoteIoTDataSource {
   }
 
   String _devicesByUserUrl(int userId) {
-    return MicroserviceEndpoints.iotDevicesByUser
-        .replaceFirst('{userId}', '$userId');
+    return MicroserviceEndpoints.iotDevicesByUser.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
   }
 
   String _hydrationByUserUrl(int userId, DateTime date) {
-    final base = MicroserviceEndpoints.iotHydrationByUser
-        .replaceFirst('{userId}', '$userId');
+    final base = MicroserviceEndpoints.iotHydrationByUser.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
     return '$base?date=${_dateParam(date)}';
   }
 
   String _hydrationSummaryUrl(int userId, DateTime date) {
-    final base = MicroserviceEndpoints.iotHydrationSummary
-        .replaceFirst('{userId}', '$userId');
+    final base = MicroserviceEndpoints.iotHydrationSummary.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
     return '$base?date=${_dateParam(date)}';
   }
 
   String _latestWeightUrl(int userId) {
-    return MicroserviceEndpoints.iotLatestWeight
-        .replaceFirst('{userId}', '$userId');
+    return MicroserviceEndpoints.iotLatestWeight.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
   }
 
   String _weightHistoryUrl(int userId, DateTime from, DateTime to) {
-    final base = MicroserviceEndpoints.iotWeightHistory
-        .replaceFirst('{userId}', '$userId');
+    final base = MicroserviceEndpoints.iotWeightHistory.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
     return '$base?from=${_dateParam(from)}&to=${_dateParam(to)}';
   }
 
@@ -154,7 +173,7 @@ class RemoteIoTDataSource {
     String url, {
     bool allowNotFound = false,
   }) async {
-    final response = await client.get(Uri.parse(url), headers: _headers);
+    final response = await _get(url);
     if (allowNotFound && response.statusCode == 404) return <String, dynamic>{};
     _ensureSuccess(response, url);
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -164,10 +183,22 @@ class RemoteIoTDataSource {
     String url, {
     bool allowNotFound = false,
   }) async {
-    final response = await client.get(Uri.parse(url), headers: _headers);
+    final response = await _get(url);
     if (allowNotFound && response.statusCode == 404) return <dynamic>[];
     _ensureSuccess(response, url);
     return jsonDecode(response.body) as List<dynamic>;
+  }
+
+  Future<http.Response> _get(String url) async {
+    try {
+      return await client
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(_requestTimeout);
+    } on Exception {
+      throw RemoteIoTException(
+        'No se pudo conectar con el backend IoT al consultar $url',
+      );
+    }
   }
 
   void _ensureSuccess(http.Response response, String url) {
@@ -178,32 +209,30 @@ class RemoteIoTDataSource {
   }
 
   Future<RemoteTrackingSnapshot> fetchTrackingSnapshot(int userId) async {
-    final trackingResponse = await client.get(
-      Uri.parse(trackingByUserUrl(userId)),
-      headers: _headers,
-    );
+    final trackingResponse = await _get(trackingByUserUrl(userId));
     if (trackingResponse.statusCode != 200) {
-      throw RemoteIoTException('Tracking no disponible para el usuario $userId');
+      throw RemoteIoTException(
+        'Tracking no disponible para el usuario $userId',
+      );
     }
 
-    final trackingMap = jsonDecode(trackingResponse.body) as Map<String, dynamic>;
+    final trackingMap =
+        jsonDecode(trackingResponse.body) as Map<String, dynamic>;
     final trackingId = (trackingMap['id'] as num).toInt();
-    final consumedMacros = _parseMacros(trackingMap['consumedMacros'] as Map<String, dynamic>?);
+    final consumedMacros = _parseMacros(
+      trackingMap['consumedMacros'] as Map<String, dynamic>?,
+    );
 
     RemoteMacros? targetMacros;
-    final goalResponse = await client.get(
-      Uri.parse(trackingGoalByUserUrl(userId)),
-      headers: _headers,
-    );
+    final goalResponse = await _get(trackingGoalByUserUrl(userId));
     if (goalResponse.statusCode == 200) {
       final goalMap = jsonDecode(goalResponse.body) as Map<String, dynamic>;
-      targetMacros = _parseMacros(goalMap['targetMacros'] as Map<String, dynamic>?);
+      targetMacros = _parseMacros(
+        goalMap['targetMacros'] as Map<String, dynamic>?,
+      );
     }
 
-    final mealsResponse = await client.get(
-      Uri.parse(mealPlanEntriesUrl(trackingId)),
-      headers: _headers,
-    );
+    final mealsResponse = await _get(mealPlanEntriesUrl(trackingId));
     final entries = <RemoteMealEntry>[];
     if (mealsResponse.statusCode == 200) {
       final meals = jsonDecode(mealsResponse.body) as List<dynamic>;
@@ -248,8 +277,9 @@ class RemoteIoTDataSource {
       name: isBottle ? 'Bebedor Inteligente' : 'Balanza Inteligente',
       type: isBottle ? 'Smart Bottle' : 'Smart Scale',
       status: active ? 'Activo' : 'Inactivo',
-      lastSync:
-          lastSeen == null ? 'Registrado' : 'Ultima sinc. ${_timeLabel(lastSeen)}',
+      lastSync: lastSeen == null
+          ? 'Registrado'
+          : 'Ultima sinc. ${_timeLabel(lastSeen)}',
       battery: 100,
       accentHex: isBottle ? 0xFF16B548 : 0xFF1E9ADF,
     );
@@ -290,8 +320,9 @@ class RemoteIoTDataSource {
         .toList();
     final currentWeight = _weightKg(latestWeight);
     final chartValues = values.isEmpty ? [currentWeight] : values;
-    final weekValues =
-        chartValues.length == 1 ? [chartValues.first, chartValues.first] : chartValues;
+    final weekValues = chartValues.length == 1
+        ? [chartValues.first, chartValues.first]
+        : chartValues;
     return WeightDetail(
       weightKg: currentWeight,
       imc: currentWeight > 0 ? currentWeight / (1.74 * 1.74) : 0,
@@ -464,11 +495,15 @@ class RemoteIoTDataSource {
     final sorted = [...records];
     sorted.sort((a, b) {
       final aDate =
-          DateTime.tryParse((a as Map<String, dynamic>)['recordedAt'] as String? ?? '') ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.tryParse(
+            (a as Map<String, dynamic>)['recordedAt'] as String? ?? '',
+          ) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
       final bDate =
-          DateTime.tryParse((b as Map<String, dynamic>)['recordedAt'] as String? ?? '') ??
-              DateTime.fromMillisecondsSinceEpoch(0);
+          DateTime.tryParse(
+            (b as Map<String, dynamic>)['recordedAt'] as String? ?? '',
+          ) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
       return aDate.compareTo(bDate);
     });
     return sorted;

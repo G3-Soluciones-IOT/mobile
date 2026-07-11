@@ -28,7 +28,7 @@ jobs:
     env:
       FIREBASE_APP_ID: 1:73307407135:android:b8054d6dc720740209a62a
       FIREBASE_GROUPS: ${{ vars.FIREBASE_GROUPS }}
-      FIREBASE_TESTERS: ${{ vars.FIREBASE_TESTERS || 'ramiroguzman747@gmail.com' }}
+      FIREBASE_TESTERS: ${{ vars.FIREBASE_TESTERS || 'ramiroguzman747@gmail.com,jhonfcbm.1900@gmail.com' }}
 
     steps:
       - name: Checkout

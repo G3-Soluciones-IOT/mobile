@@ -32,6 +32,10 @@ android {
 
     buildTypes {
         release {
+            // Keep release builds compatible with flutter_stripe until the
+            // Stripe Android dependency is upgraded and verified with R8.
+            isMinifyEnabled = false
+            isShrinkResources = false
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")

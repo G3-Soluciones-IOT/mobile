@@ -276,7 +276,7 @@ class _LoginPageState extends State<LoginPage> {
                                 if (_isSignUpMode) ...[
                                   const SizedBox(height: 8),
                                   const Text(
-                                    'Podrás completar tu perfil después de crear tu cuenta.',
+                                    'Luego completarás tu perfil y tus metas de salud.',
                                     style: TextStyle(
                                       color: Color(0xFF8892A6),
                                       fontSize: 12.5,

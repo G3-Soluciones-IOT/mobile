@@ -14,6 +14,50 @@ class MockIoTDataSource {
         sourceLabel: 'Mock local',
         message: 'Pendiente de conectar tracking-service',
       ),
+      userSummary: UserSummary(
+        displayName: 'Carlos',
+        objectiveLabel: 'Perder peso',
+        activityLabel: 'Activo',
+        userScore: 82,
+        genderLabel: 'Masculino',
+        ageLabel: '26 años',
+        heightCm: 174,
+        weightKg: 67.2,
+        targetWeightKg: 65,
+        dietLabel: 'High protein',
+        dailyCalories: 2200,
+        macros: [
+          MacroStatus(
+            label: 'Calorias',
+            consumed: 1460,
+            target: 2200,
+            unit: 'kcal',
+            accentHex: 0xFF16B548,
+          ),
+          MacroStatus(
+            label: 'Carbohidratos',
+            consumed: 152,
+            target: 240,
+            unit: 'g',
+            accentHex: 0xFF1E9ADF,
+          ),
+          MacroStatus(
+            label: 'Proteinas',
+            consumed: 96,
+            target: 135,
+            unit: 'g',
+            accentHex: 0xFFA02CC8,
+          ),
+          MacroStatus(
+            label: 'Grasas',
+            consumed: 48,
+            target: 73,
+            unit: 'g',
+            accentHex: 0xFFE66300,
+          ),
+        ],
+        allergies: ['Lactosa'],
+      ),
       linkedDevices: [
         LinkedDevice(
           name: 'Bebedor Inteligente',
@@ -93,7 +137,8 @@ class MockIoTDataSource {
         status: 'En línea',
         messages: [
           CoachMessage(
-            text: 'Hola Carlos 👋 Hoy bebiste solo 1.4L. Te recomiendo tomar 300ml ahora antes de tu cena.',
+            text:
+                'Hola Carlos 👋 Hoy bebiste solo 1.4L. Te recomiendo tomar 300ml ahora antes de tu cena.',
             isAssistant: true,
           ),
           CoachMessage(
@@ -101,15 +146,14 @@ class MockIoTDataSource {
             isAssistant: false,
           ),
           CoachMessage(
-            text: 'Según tu balanza (67.2kg) y tu meta de bajar 0.5kg/semana, tu cena ideal es: 400-450kcal. Sugiero proteína + verduras.',
+            text:
+                'Según tu balanza (67.2kg) y tu meta de bajar 0.5kg/semana, tu cena ideal es: 400-450kcal. Sugiero proteína + verduras.',
             isAssistant: true,
           ),
+          CoachMessage(text: 'Sí, genera el plan', isAssistant: false),
           CoachMessage(
-            text: 'Sí, genera el plan',
-            isAssistant: false,
-          ),
-          CoachMessage(
-            text: 'Basado en tus datos del bebedor y balanza, te sugiero: Pollo grillado 150g + ensalada + quinoa 60g. Total: 420kcal.',
+            text:
+                'Basado en tus datos del bebedor y balanza, te sugiero: Pollo grillado 150g + ensalada + quinoa 60g. Total: 420kcal.',
             isAssistant: true,
           ),
         ],
@@ -209,10 +253,30 @@ class MockIoTDataSource {
       setup: DeviceSetup(
         searchLabel: 'Buscando dispositivos cerca...',
         steps: [
-          SetupStep(order: 1, title: 'Bluetooth activado en tu teléfono', isDone: true, isActive: false),
-          SetupStep(order: 2, title: 'Dispositivo en modo de emparejamiento', isDone: true, isActive: false),
-          SetupStep(order: 3, title: 'Selecciona tu dispositivo', isDone: false, isActive: true),
-          SetupStep(order: 4, title: 'Confirmar vinculación', isDone: false, isActive: false),
+          SetupStep(
+            order: 1,
+            title: 'Bluetooth activado en tu teléfono',
+            isDone: true,
+            isActive: false,
+          ),
+          SetupStep(
+            order: 2,
+            title: 'Dispositivo en modo de emparejamiento',
+            isDone: true,
+            isActive: false,
+          ),
+          SetupStep(
+            order: 3,
+            title: 'Selecciona tu dispositivo',
+            isDone: false,
+            isActive: true,
+          ),
+          SetupStep(
+            order: 4,
+            title: 'Confirmar vinculación',
+            isDone: false,
+            isActive: false,
+          ),
         ],
         foundDevice: LinkedDevice(
           name: 'JameoFit Bottle S1',

@@ -7,6 +7,7 @@ import 'package:jameofit/features/iot/domain/entities/iot_entities.dart';
 class RemoteIoTDataSource {
   const RemoteIoTDataSource({
     required this.userId,
+    this.username,
     this.authToken,
     http.Client? client,
   }) : _client = client;
@@ -14,6 +15,7 @@ class RemoteIoTDataSource {
   static const _requestTimeout = Duration(seconds: 15);
 
   final int userId;
+  final String? username;
   final String? authToken;
   final http.Client? _client;
 
@@ -31,14 +33,42 @@ class RemoteIoTDataSource {
     final today = DateTime.now();
     final yesterday = today.subtract(const Duration(days: 1));
     final weekStart = today.subtract(const Duration(days: 6));
+    var iotUnavailable = false;
+
+    Future<List<dynamic>> safeIoTList(
+      String url, {
+      bool allowNotFound = false,
+    }) async {
+      try {
+        return await _getJsonList(url, allowNotFound: allowNotFound);
+      } on RemoteIoTException {
+        iotUnavailable = true;
+        return <dynamic>[];
+      }
+    }
+
+    Future<Map<String, dynamic>> safeIoTMap(
+      String url, {
+      bool allowNotFound = false,
+    }) async {
+      try {
+        return await _getJsonMap(url, allowNotFound: allowNotFound);
+      } on RemoteIoTException {
+        iotUnavailable = true;
+        return <String, dynamic>{};
+      }
+    }
 
     final responses = await Future.wait([
-      _getJsonList(_devicesByUserUrl(userId)),
-      _getJsonMap(_hydrationSummaryUrl(userId, today)),
-      _getJsonList(_hydrationByUserUrl(userId, today)),
-      _getJsonMap(_latestWeightUrl(userId), allowNotFound: true),
-      _getJsonList(_weightHistoryUrl(userId, weekStart, today)),
-      _getJsonList(_hydrationByUserUrl(userId, yesterday), allowNotFound: true),
+      safeIoTList(_devicesByUserUrl(userId)),
+      safeIoTMap(_hydrationSummaryUrl(userId, today)),
+      safeIoTList(_hydrationByUserUrl(userId, today)),
+      safeIoTMap(_latestWeightUrl(userId), allowNotFound: true),
+      safeIoTList(_weightHistoryUrl(userId, weekStart, today)),
+      safeIoTList(_hydrationByUserUrl(userId, yesterday), allowNotFound: true),
+      _getJsonMap(trackingProgressUrl(userId), allowNotFound: true),
+      _getJsonMap(_goalByUserUrl(userId), allowNotFound: true),
+      _getJsonMap(_userProfileByUserUrl(userId), allowNotFound: true),
     ]);
 
     final devices = responses[0] as List<dynamic>;
@@ -47,6 +77,9 @@ class RemoteIoTDataSource {
     final latestWeight = responses[3] as Map<String, dynamic>;
     final weightHistory = responses[4] as List<dynamic>;
     final yesterdayHydrationRecords = responses[5] as List<dynamic>;
+    final trackingProgress = responses[6] as Map<String, dynamic>;
+    final goal = responses[7] as Map<String, dynamic>;
+    final userProfile = responses[8] as Map<String, dynamic>;
 
     final linkedDevices = devices.map(_linkedDeviceFromJson).toList();
     final waterLiters = _numValue(hydrationSummary['totalMl']) / 1000;
@@ -73,9 +106,17 @@ class RemoteIoTDataSource {
       userName: 'Usuario $userId',
       liveModeLabel: 'EN DIRECTO',
       integrationStatus: IntegrationStatus(
-        isConnected: true,
+        isConnected: !iotUnavailable,
         sourceLabel: 'iot-service',
-        message: 'Datos sincronizados desde IoT service',
+        message: iotUnavailable
+            ? 'El servicio IoT no esta disponible temporalmente. Se muestran los datos del perfil y metas.'
+            : 'Datos sincronizados desde IoT service',
+      ),
+      userSummary: _buildUserSummary(
+        userProfile: userProfile,
+        goal: goal,
+        trackingProgress: trackingProgress,
+        fallbackWeightKg: weightKg,
       ),
       linkedDevices: linkedDevices,
       dailySummary: DailySummary(
@@ -129,6 +170,17 @@ class RemoteIoTDataSource {
 
   String mealPlanEntriesUrl(int trackingId) {
     return '${MicroserviceEndpoints.trackingBaseUrl}/meal-plan-entries/tracking/$trackingId';
+  }
+
+  String _goalByUserUrl(int userId) {
+    return '${MicroserviceEndpoints.goals}?userId=$userId';
+  }
+
+  String _userProfileByUserUrl(int userId) {
+    return MicroserviceEndpoints.userProfileByUser.replaceFirst(
+      '{userId}',
+      '$userId',
+    );
   }
 
   String _devicesByUserUrl(int userId) {
@@ -267,6 +319,73 @@ class RemoteIoTDataSource {
     );
   }
 
+  UserSummary _buildUserSummary({
+    required Map<String, dynamic> userProfile,
+    required Map<String, dynamic> goal,
+    required Map<String, dynamic> trackingProgress,
+    required double fallbackWeightKg,
+  }) {
+    final consumed =
+        trackingProgress['consumed'] as Map<String, dynamic>? ?? {};
+    final target = trackingProgress['target'] as Map<String, dynamic>? ?? {};
+    final goalObjective = '${goal['objective'] ?? ''}';
+    final profileObjective = '${userProfile['objectiveName'] ?? ''}';
+    final allergies =
+        (userProfile['allergyNames'] as List<dynamic>? ?? const [])
+            .map((item) => '$item')
+            .where((item) => item.isNotEmpty)
+            .toList();
+
+    return UserSummary(
+      displayName: (username?.trim().isNotEmpty ?? false)
+          ? username!.trim()
+          : 'Usuario $userId',
+      objectiveLabel: _friendlyObjective(profileObjective, goalObjective),
+      activityLabel: _friendlyText('${userProfile['activityLevelName'] ?? ''}'),
+      userScore: (userProfile['userScore'] as num?)?.toInt() ?? 0,
+      genderLabel: _friendlyGender('${userProfile['gender'] ?? ''}'),
+      ageLabel: _ageLabel(userProfile['birthDate'] as String?),
+      heightCm: _normalizeHeightCm(_numValue(userProfile['height'])),
+      weightKg: _numValue(userProfile['weight']) > 0
+          ? _numValue(userProfile['weight'])
+          : fallbackWeightKg,
+      targetWeightKg: _numValue(goal['targetWeightKg']),
+      dietLabel: _friendlyText('${goal['dietPreset'] ?? ''}'),
+      dailyCalories: _numValue(target['calories']),
+      macros: [
+        MacroStatus(
+          label: 'Calorias',
+          consumed: _numValue(consumed['calories']),
+          target: _numValue(target['calories']),
+          unit: 'kcal',
+          accentHex: 0xFF16B548,
+        ),
+        MacroStatus(
+          label: 'Carbohidratos',
+          consumed: _numValue(consumed['carbs']),
+          target: _numValue(target['carbs']),
+          unit: 'g',
+          accentHex: 0xFF1E9ADF,
+        ),
+        MacroStatus(
+          label: 'Proteinas',
+          consumed: _numValue(consumed['proteins']),
+          target: _numValue(target['proteins']),
+          unit: 'g',
+          accentHex: 0xFFA02CC8,
+        ),
+        MacroStatus(
+          label: 'Grasas',
+          consumed: _numValue(consumed['fats']),
+          target: _numValue(target['fats']),
+          unit: 'g',
+          accentHex: 0xFFE66300,
+        ),
+      ],
+      allergies: allergies,
+    );
+  }
+
   LinkedDevice _linkedDeviceFromJson(dynamic json) {
     final map = json as Map<String, dynamic>;
     final type = '${map['deviceType'] ?? ''}';
@@ -302,7 +421,7 @@ class RemoteIoTDataSource {
         final map = record as Map<String, dynamic>;
         return HydrationRecord(
           time: _timeLabel(map['recordedAt'] as String?),
-          title: 'Toma automatica',
+          title: 'Toma automática',
           subtitle: 'Registrado por ${map['deviceId'] ?? 'dispositivo IoT'}',
           amountMl: _numValue(map['amountMl']).round(),
         );
@@ -328,7 +447,7 @@ class RemoteIoTDataSource {
       imc: currentWeight > 0 ? currentWeight / (1.74 * 1.74) : 0,
       lastMeasurement: latestWeight.isEmpty
           ? 'Sin mediciones registradas'
-          : 'Ultima medicion: ${_timeLabel(latestWeight['recordedAt'] as String?)}',
+          : 'Última medición: ${_timeLabel(latestWeight['recordedAt'] as String?)}',
       weekLabels: _weekLabels(weekValues.length),
       weekValues: weekValues,
       composition: const [
@@ -364,7 +483,7 @@ class RemoteIoTDataSource {
         CoachMessage(
           text: pending > 0
               ? 'Hoy llevas ${waterLiters.toStringAsFixed(1)}L. Te faltan ${pending.toStringAsFixed(1)}L para llegar a tu meta.'
-              : 'Meta de hidratacion alcanzada hoy. Buen ritmo.',
+              : 'Meta de hidratación alcanzada hoy. Buen ritmo.',
           isAssistant: true,
         ),
         CoachMessage(
@@ -385,8 +504,8 @@ class RemoteIoTDataSource {
     final notifications = <AlertNotification>[
       AlertNotification(
         title: waterLiters >= goalLiters
-            ? 'Meta de hidratacion cumplida'
-            : 'Hidratacion bajo la meta',
+            ? 'Meta de hidratación cumplida'
+            : 'Hidratación bajo la meta',
         subtitle:
             '${waterLiters.toStringAsFixed(1)}L de ${goalLiters.toStringAsFixed(1)}L',
         timeLabel: 'Hoy',
@@ -404,8 +523,8 @@ class RemoteIoTDataSource {
       summary: '${notifications.length} notificaciones hoy',
       notifications: notifications,
       toggles: const [
-        SettingToggle(label: 'Alerta de hidratacion baja', enabled: true),
-        SettingToggle(label: 'Sincronizacion de peso', enabled: true),
+        SettingToggle(label: 'Alerta de hidratación baja', enabled: true),
+        SettingToggle(label: 'Sincronización de peso', enabled: true),
       ],
     );
   }
@@ -414,16 +533,16 @@ class RemoteIoTDataSource {
     return IoTSettings(
       deviceToggles: const [
         SettingToggle(label: 'Auto-registro habilitado', enabled: true),
-        SettingToggle(label: 'Notificaciones de hidratacion', enabled: true),
+        SettingToggle(label: 'Notificaciones de hidratación', enabled: true),
       ],
       scaleToggles: const [
-        SettingToggle(label: 'Sincronizacion automatica', enabled: true),
+        SettingToggle(label: 'Sincronización automática', enabled: true),
         SettingToggle(label: 'Mostrar composicion corporal', enabled: false),
       ],
       tags: {
         'Meta diaria de agua': '${goalLiters.toStringAsFixed(1)} L',
         'Frecuencia de alerta': 'Diaria',
-        'Max. sugerencias por dia': '5 mensajes',
+        'Máx. sugerencias por día': '5 mensajes',
       },
     );
   }
@@ -434,7 +553,7 @@ class RemoteIoTDataSource {
       steps: [
         SetupStep(
           order: 1,
-          title: 'Bluetooth activado en tu telefono',
+          title: 'Bluetooth activado en tu teléfono',
           isDone: true,
           isActive: false,
         ),
@@ -452,7 +571,7 @@ class RemoteIoTDataSource {
         ),
         SetupStep(
           order: 4,
-          title: 'Confirmar vinculacion',
+          title: 'Confirmar vinculación',
           isDone: false,
           isActive: false,
         ),
@@ -473,7 +592,7 @@ class RemoteIoTDataSource {
       final map = record as Map<String, dynamic>;
       return HistoryEntry(
         time: _timeLabel(map['recordedAt'] as String?),
-        title: 'Toma automatica',
+        title: 'Toma automática',
         subtitle: 'Sensor de flujo - ${map['deviceId'] ?? 'Bebedor'}',
         value: '${_numValue(map['amountMl']).round()}ml',
         accentHex: 0xFFD9EDFB,
@@ -484,7 +603,7 @@ class RemoteIoTDataSource {
   HistoryEntry _historyEntryFromWeight(Map<String, dynamic> record) {
     return HistoryEntry(
       time: _timeLabel(record['recordedAt'] as String?),
-      title: 'Medicion de peso',
+      title: 'Medición de peso',
       subtitle: 'Balanza inteligente - ${record['deviceId'] ?? 'IoT'}',
       value: '${_weightKg(record).toStringAsFixed(1)}kg',
       accentHex: 0xFFCFEFDB,
@@ -510,19 +629,94 @@ class RemoteIoTDataSource {
   }
 
   String _hydrationHint(double waterLiters, double goalLiters) {
+    if (goalLiters <= 0) {
+      return 'Configura tu meta diaria de agua para ver recomendaciones.';
+    }
     final pending = goalLiters - waterLiters;
     if (pending <= 0) return 'Meta diaria de agua alcanzada';
-    return 'Bebe ${pending.toStringAsFixed(1)}L mas para alcanzar tu meta diaria';
+    return 'Bebe ${pending.toStringAsFixed(1)}L más para alcanzar tu meta diaria';
   }
 
   String _weightInsight(List<double> values) {
     if (values.length < 2) {
-      return 'Esperando mas mediciones para calcular tendencia';
+      return 'Esperando más mediciones para calcular tendencia';
     }
     final delta = values.last - values.first;
     if (delta.abs() < 0.1) return 'Peso estable esta semana';
     final verb = delta < 0 ? 'bajaste' : 'subiste';
     return 'Tendencia semanal: $verb ${delta.abs().toStringAsFixed(1)}kg';
+  }
+
+  String _friendlyText(String raw) {
+    if (raw.isEmpty) return 'Sin definir';
+    return raw
+        .split('_')
+        .map(
+          (token) => token.isEmpty
+              ? token
+              : '${token[0]}${token.substring(1).toLowerCase()}',
+        )
+        .join(' ');
+  }
+
+  String _friendlyObjective(String profileObjective, String goalObjective) {
+    if (profileObjective.isNotEmpty) return profileObjective;
+    switch (goalObjective) {
+      case 'LOSE_WEIGHT':
+        return 'Perder peso';
+      case 'GAIN_MUSCLE':
+        return 'Ganar musculo';
+      case 'MAINTAIN_WEIGHT':
+        return 'Mantener peso';
+      default:
+        return 'Sin objetivo';
+    }
+  }
+
+  String _friendlyGender(String raw) {
+    switch (raw.toUpperCase()) {
+      case 'MALE':
+        return 'Masculino';
+      case 'FEMALE':
+        return 'Femenino';
+      default:
+        return raw.isEmpty ? 'Sin definir' : _friendlyText(raw);
+    }
+  }
+
+  String _ageLabel(String? birthDate) {
+    if (birthDate == null || birthDate.isEmpty) return 'Edad no registrada';
+    final date = _parseBirthDate(birthDate);
+    if (date == null) return 'Edad no registrada';
+    final now = DateTime.now();
+    var age = now.year - date.year;
+    final birthdayPending =
+        now.month < date.month ||
+        (now.month == date.month && now.day < date.day);
+    if (birthdayPending) age--;
+    return '$age años';
+  }
+
+  DateTime? _parseBirthDate(String raw) {
+    final isoDate = DateTime.tryParse(raw);
+    if (isoDate != null) return isoDate;
+
+    final parts = raw.split('/');
+    if (parts.length != 3) return null;
+
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    return DateTime(year, month, day);
+  }
+
+  double _normalizeHeightCm(double rawHeight) {
+    if (rawHeight <= 0) return 0;
+    if (rawHeight <= 3) return rawHeight * 100;
+    return rawHeight;
   }
 
   List<String> _weekLabels(int length) {

@@ -1,0 +1,117 @@
+name: Build and Distribute Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "Notas de la versión para Firebase App Distribution"
+        required: false
+        default: ""
+      firebase_groups:
+        description: "Grupos de Firebase App Distribution"
+        required: false
+        default: ""
+      firebase_testers:
+        description: "Correos de testers separados por coma"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  android-distribution:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_APP_ID: 1:73307407135:android:b8054d6dc720740209a62a
+      FIREBASE_GROUPS: ${{ vars.FIREBASE_GROUPS }}
+      FIREBASE_TESTERS: ${{ vars.FIREBASE_TESTERS || 'ramiroguzman747@gmail.com,jhonfcbm.1900@gmail.com' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.7
+          cache: true
+
+      - name: Validate workflow configuration
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "Falta configurar el secret FIREBASE_SERVICE_ACCOUNT"
+            exit 1
+          fi
+
+          if [ -z "$FIREBASE_GROUPS" ] && [ -z "$FIREBASE_TESTERS" ] && [ -z "${{ github.event.inputs.firebase_groups }}" ] && [ -z "${{ github.event.inputs.firebase_testers }}" ]; then
+            echo "Configura FIREBASE_GROUPS o FIREBASE_TESTERS para distribuir el APK"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/apk/release/app-release.apk
+
+      - name: Setup Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Write Firebase service account
+        shell: bash
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+
+      - name: Distribute to Firebase App Distribution
+        shell: bash
+        run: |
+          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              RELEASE_NOTES="Release ${GITHUB_REF_NAME}"
+            else
+              RELEASE_NOTES="Build ${GITHUB_SHA::7} generado desde GitHub Actions"
+            fi
+          fi
+
+          EFFECTIVE_GROUPS="${{ github.event.inputs.firebase_groups }}"
+          EFFECTIVE_TESTERS="${{ github.event.inputs.firebase_testers }}"
+
+          if [ -z "$EFFECTIVE_GROUPS" ]; then
+            EFFECTIVE_GROUPS="$FIREBASE_GROUPS"
+          fi
+          if [ -z "$EFFECTIVE_TESTERS" ]; then
+            EFFECTIVE_TESTERS="$FIREBASE_TESTERS"
+          fi
+
+          DISTRIBUTION_ARGS=()
+          if [ -n "$EFFECTIVE_GROUPS" ]; then
+            DISTRIBUTION_ARGS+=(--groups "$EFFECTIVE_GROUPS")
+          fi
+          if [ -n "$EFFECTIVE_TESTERS" ]; then
+            DISTRIBUTION_ARGS+=(--testers "$EFFECTIVE_TESTERS")
+          fi
+
+          firebase appdistribution:distribute build/app/outputs/apk/release/app-release.apk \
+            --app "$FIREBASE_APP_ID" \
+            --release-notes "$RELEASE_NOTES" \
+            "${DISTRIBUTION_ARGS[@]}"

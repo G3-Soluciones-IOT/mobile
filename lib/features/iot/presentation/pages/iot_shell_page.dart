@@ -77,6 +77,8 @@ class _IoTShellPageState extends State<IoTShellPage> {
           _HistoryPage(history: overview.history),
           _DashboardPage(
             overview: overview,
+            bloc: widget.bloc,
+            session: widget.session,
             openPage: (page) {
               Navigator.of(
                 context,
@@ -231,9 +233,16 @@ class _IoTShellPageState extends State<IoTShellPage> {
 }
 
 class _DashboardPage extends StatelessWidget {
-  const _DashboardPage({required this.overview, required this.openPage});
+  const _DashboardPage({
+    required this.overview,
+    required this.bloc,
+    required this.session,
+    required this.openPage,
+  });
 
   final IoTOverview overview;
+  final IoTBloc bloc;
+  final AuthSession session;
   final void Function(Widget page) openPage;
 
   @override
@@ -302,8 +311,13 @@ class _DashboardPage extends StatelessWidget {
               const SizedBox(height: 14),
               PrimaryAction(
                 label: '+ Agregar dispositivo',
-                onPressed: () =>
-                    openPage(_LinkDevicePage(setup: overview.setup)),
+                onPressed: () => openPage(
+                  _LinkDevicePage(
+                    setup: overview.setup,
+                    bloc: bloc,
+                    session: session,
+                  ),
+                ),
               ),
             ],
           ),
@@ -329,6 +343,7 @@ class _HydrationPage extends StatelessWidget {
             title: 'Hidratación',
             subtitle: 'Bebedor Inteligente · Hoy',
             tag: hydration.statusLabel,
+            onBack: () => Navigator.of(context).pop(),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
@@ -417,6 +432,7 @@ class _ScalePage extends StatelessWidget {
           ScreenHeader(
             title: 'Balanza Inteligente',
             subtitle: weight.lastMeasurement,
+            onBack: () => Navigator.of(context).pop(),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
@@ -758,19 +774,147 @@ class _HistoryPage extends StatelessWidget {
   }
 }
 
-class _LinkDevicePage extends StatelessWidget {
-  const _LinkDevicePage({required this.setup});
+class _LinkDevicePage extends StatefulWidget {
+  const _LinkDevicePage({
+    required this.setup,
+    required this.bloc,
+    required this.session,
+  });
 
   final DeviceSetup setup;
+  final IoTBloc bloc;
+  final AuthSession session;
+
+  @override
+  State<_LinkDevicePage> createState() => _LinkDevicePageState();
+}
+
+class _LinkDevicePageState extends State<_LinkDevicePage> {
+  static const _deviceTypes = <_DeviceTypeOption>[
+    _DeviceTypeOption(
+      value: 'SMART_BOTTLE',
+      label: 'Bebedor inteligente',
+      description: 'Registra tomas de agua y seguimiento de hidratacion.',
+    ),
+    _DeviceTypeOption(
+      value: 'SMART_SCALE',
+      label: 'Balanza inteligente',
+      description: 'Sincroniza peso y mediciones corporales.',
+    ),
+  ];
+
+  final _deviceIdController = TextEditingController();
+  String _selectedType = _deviceTypes.first.value;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _deviceIdController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final deviceId = _deviceIdController.text.trim();
+    if (deviceId.isEmpty) {
+      setState(() {
+        _errorMessage = 'Ingresa el identificador real del dispositivo.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final registered = await widget.bloc.registerDevice(
+        userId: widget.session.userId,
+        deviceId: deviceId,
+        deviceType: _selectedType,
+      );
+
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Dispositivo vinculado'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Se vinculo ${registered.deviceId} a tu cuenta.'),
+              const SizedBox(height: 12),
+              const Text(
+                'Guarda esta API key en el dispositivo fisico. El backend la devuelve una sola vez.',
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6F7F3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: SelectableText(
+                  registered.apiKey.isEmpty
+                      ? 'No se recibio API key en la respuesta.'
+                      : registered.apiKey,
+                  style: const TextStyle(
+                    color: AppTheme.ink,
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+
+      widget.bloc.add(const IoTOverviewRequested());
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '$error';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final selectedOption = _deviceTypes.firstWhere(
+      (option) => option.value == _selectedType,
+    );
+
     return Scaffold(
       backgroundColor: AppTheme.canvas,
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const ScreenHeader(title: 'Vincular dispositivo', subtitle: ''),
+          ScreenHeader(
+            title: 'Vincular dispositivo',
+            subtitle: '',
+            onBack: () => Navigator.of(context).pop(),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
             child: Column(
@@ -778,27 +922,138 @@ class _LinkDevicePage extends StatelessWidget {
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: const Color(0xFFC8C8C8),
-                      width: 2,
-                    ),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFC8C8C8)),
                   ),
-                  child: Center(
-                    child: Text(
-                      setup.searchLabel,
-                      style: const TextStyle(color: AppTheme.muted),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ID del dispositivo',
+                        style: TextStyle(
+                          color: AppTheme.ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _deviceIdController,
+                        enabled: !_isSubmitting,
+                        decoration: const InputDecoration(
+                          hintText: 'Ej. bottle-s1-001',
+                          filled: true,
+                          fillColor: Color(0xFFF2F5FB),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            borderSide: BorderSide(
+                              color: AppTheme.brandGreen,
+                              width: 1.4,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Tipo de dispositivo',
+                        style: TextStyle(
+                          color: AppTheme.ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedType,
+                        decoration: const InputDecoration(
+                          filled: true,
+                          fillColor: Color(0xFFF2F5FB),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            borderSide: BorderSide(
+                              color: AppTheme.brandGreen,
+                              width: 1.4,
+                            ),
+                          ),
+                        ),
+                        items: _deviceTypes
+                            .map(
+                              (option) => DropdownMenuItem<String>(
+                                value: option.value,
+                                child: Text(option.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _selectedType = value;
+                                });
+                              },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        selectedOption.description,
+                        style: const TextStyle(
+                          color: AppTheme.muted,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SectionTitle('PASOS DE CONFIGURACIÓN'),
-                ...setup.steps.map((step) => SetupStepTile(step: step)),
-                DeviceCard(device: setup.foundDevice, onTap: () {}),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.softOrange,
+                      borderRadius: BorderRadius.circular(14),
+                      border: const Border(
+                        left: BorderSide(color: Color(0xFFFF9900), width: 4),
+                      ),
+                    ),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(
+                        color: Color(0xFFE66300),
+                        fontSize: 14,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
+                const SectionTitle('PASOS DE CONFIGURACION'),
+                ...widget.setup.steps.map((step) => SetupStepTile(step: step)),
+                DeviceCard(device: widget.setup.foundDevice, onTap: () {}),
                 PrimaryAction(
-                  label: 'Conectar dispositivo',
-                  onPressed: () => Navigator.pop(context),
+                  label: _isSubmitting
+                      ? 'Registrando dispositivo...'
+                      : 'Conectar dispositivo',
+                  onPressed: _isSubmitting ? () {} : _submit,
                 ),
               ],
             ),
@@ -807,6 +1062,18 @@ class _LinkDevicePage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DeviceTypeOption {
+  const _DeviceTypeOption({
+    required this.value,
+    required this.label,
+    required this.description,
+  });
+
+  final String value;
+  final String label;
+  final String description;
 }
 
 class _UserSummaryPage extends StatelessWidget {

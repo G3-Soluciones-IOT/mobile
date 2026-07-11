@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:jameofit/features/iot/domain/entities/iot_entities.dart';
 import 'package:jameofit/features/iot/domain/repositories/iot_repository.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_event.dart';
 import 'package:jameofit/features/iot/presentation/bloc/iot_state.dart';
@@ -21,6 +22,18 @@ class IoTBloc {
 
   Stream<IoTState> get stream => _stateController.stream;
 
+  Future<RegisteredIoTDevice> registerDevice({
+    required int userId,
+    required String deviceId,
+    required String deviceType,
+  }) {
+    return _repository.registerDevice(
+      userId: userId,
+      deviceId: deviceId,
+      deviceType: deviceType,
+    );
+  }
+
   void add(IoTEvent event) {
     if (!_eventController.isClosed) {
       _eventController.add(event);
@@ -40,11 +53,7 @@ class IoTBloc {
       final overview = await _repository.getOverview();
       _emit(IoTLoaded(overview: overview));
     } catch (_) {
-      _emit(
-        const IoTFailure(
-          message: 'No se pudo cargar la experiencia IoT.',
-        ),
-      );
+      _emit(const IoTFailure(message: 'No se pudo cargar la experiencia IoT.'));
     }
   }
 

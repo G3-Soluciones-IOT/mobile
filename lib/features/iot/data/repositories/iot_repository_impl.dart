@@ -3,14 +3,26 @@ import 'package:jameofit/features/iot/domain/entities/iot_entities.dart';
 import 'package:jameofit/features/iot/domain/repositories/iot_repository.dart';
 
 class IoTRepositoryImpl implements IoTRepository {
-  IoTRepositoryImpl({
-    required RemoteIoTDataSource dataSource,
-  }) : _dataSource = dataSource;
+  IoTRepositoryImpl({required RemoteIoTDataSource dataSource})
+    : _dataSource = dataSource;
 
   final RemoteIoTDataSource _dataSource;
 
   @override
   Future<IoTOverview> getOverview() {
     return _dataSource.fetchOverview();
+  }
+
+  @override
+  Future<RegisteredIoTDevice> registerDevice({
+    required int userId,
+    required String deviceId,
+    required String deviceType,
+  }) {
+    return _dataSource.registerDevice(
+      userId: userId,
+      deviceId: deviceId,
+      deviceType: deviceType,
+    );
   }
 }

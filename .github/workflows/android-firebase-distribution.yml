@@ -64,7 +64,10 @@ jobs:
         run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release
+        # R8 is the failing release phase. Keep the APK release-signed while
+        # skipping bytecode shrinking until its detailed missing-rule output
+        # can be retrieved from the build log.
+        run: flutter build apk --release --no-shrink
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

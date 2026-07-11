@@ -40,6 +40,8 @@ class MicroserviceEndpoints {
       '$mealPlansBaseUrl/meal-plan/profile/{profileId}';
   static String get goals => '$goalsBaseUrl/goals';
   static String get profiles => '$profilesBaseUrl/profiles';
+  static String get userProfileByUser =>
+      '$profilesBaseUrl/user-profiles/by-user/{userId}';
   static String get signIn => '$authenticationBaseUrl/sign-in';
   static String get signUp => '$authenticationBaseUrl/sign-up';
   static String get iotDevicesByUser => '$iotBaseUrl/iot/devices/{userId}';

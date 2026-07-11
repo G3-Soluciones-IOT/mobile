@@ -3,6 +3,7 @@ class IoTOverview {
     required this.userName,
     required this.liveModeLabel,
     required this.integrationStatus,
+    required this.userSummary,
     required this.linkedDevices,
     required this.dailySummary,
     required this.hydration,
@@ -17,6 +18,7 @@ class IoTOverview {
   final String userName;
   final String liveModeLabel;
   final IntegrationStatus integrationStatus;
+  final UserSummary userSummary;
   final List<LinkedDevice> linkedDevices;
   final DailySummary dailySummary;
   final HydrationDetail hydration;
@@ -26,6 +28,59 @@ class IoTOverview {
   final IoTSettings settings;
   final HistoryFeed history;
   final DeviceSetup setup;
+}
+
+class UserSummary {
+  const UserSummary({
+    required this.displayName,
+    required this.objectiveLabel,
+    required this.activityLabel,
+    required this.userScore,
+    required this.genderLabel,
+    required this.ageLabel,
+    required this.heightCm,
+    required this.weightKg,
+    required this.targetWeightKg,
+    required this.dietLabel,
+    required this.dailyCalories,
+    required this.macros,
+    required this.allergies,
+  });
+
+  final String displayName;
+  final String objectiveLabel;
+  final String activityLabel;
+  final int userScore;
+  final String genderLabel;
+  final String ageLabel;
+  final double heightCm;
+  final double weightKg;
+  final double targetWeightKg;
+  final String dietLabel;
+  final double dailyCalories;
+  final List<MacroStatus> macros;
+  final List<String> allergies;
+}
+
+class MacroStatus {
+  const MacroStatus({
+    required this.label,
+    required this.consumed,
+    required this.target,
+    required this.unit,
+    required this.accentHex,
+  });
+
+  final String label;
+  final double consumed;
+  final double target;
+  final String unit;
+  final int accentHex;
+
+  double get progress {
+    if (target <= 0) return 0;
+    return (consumed / target).clamp(0, 1);
+  }
 }
 
 class IntegrationStatus {
@@ -135,20 +190,14 @@ class BodyCompositionMetric {
 }
 
 class CoachConversation {
-  const CoachConversation({
-    required this.status,
-    required this.messages,
-  });
+  const CoachConversation({required this.status, required this.messages});
 
   final String status;
   final List<CoachMessage> messages;
 }
 
 class CoachMessage {
-  const CoachMessage({
-    required this.text,
-    required this.isAssistant,
-  });
+  const CoachMessage({required this.text, required this.isAssistant});
 
   final String text;
   final bool isAssistant;
@@ -181,10 +230,7 @@ class AlertNotification {
 }
 
 class SettingToggle {
-  const SettingToggle({
-    required this.label,
-    required this.enabled,
-  });
+  const SettingToggle({required this.label, required this.enabled});
 
   final String label;
   final bool enabled;

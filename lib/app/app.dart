@@ -27,6 +27,7 @@ class _JameoFitAppState extends State<JameoFitApp> {
       repository: IoTRepositoryImpl(
         dataSource: RemoteIoTDataSource(
           userId: session.userId,
+          username: session.username,
           authToken: session.token,
         ),
       ),

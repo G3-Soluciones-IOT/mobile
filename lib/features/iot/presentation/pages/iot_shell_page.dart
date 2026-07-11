@@ -73,7 +73,7 @@ class _IoTShellPageState extends State<IoTShellPage> {
 
         final overview = (state as IoTLoaded).overview;
         final pages = [
-          _SimpleHomePage(),
+          _UserSummaryPage(summary: overview.userSummary),
           _HistoryPage(history: overview.history),
           _DashboardPage(
             overview: overview,
@@ -95,18 +95,40 @@ class _IoTShellPageState extends State<IoTShellPage> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Row(
                     children: [
-                      const Expanded(
-                        child: Text(
-                          'JameoFit',
-                          style: TextStyle(
-                            color: AppTheme.ink,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'JameoFit',
+                              style: TextStyle(
+                                color: AppTheme.ink,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              widget.session.username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppTheme.muted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       PopupMenuButton<String>(
-                        tooltip: 'Sesion',
+                        tooltip: 'Sesión',
+                        offset: const Offset(0, 50),
+                        color: Colors.white,
+                        elevation: 10,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        padding: EdgeInsets.zero,
                         onSelected: (value) {
                           if (value == 'logout') {
                             widget.onLogout();
@@ -116,24 +138,78 @@ class _IoTShellPageState extends State<IoTShellPage> {
                           PopupMenuItem<String>(
                             enabled: false,
                             value: 'session',
-                            child: Text(widget.session.username),
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Sesión activa',
+                                  style: TextStyle(
+                                    color: AppTheme.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  widget.session.username,
+                                  style: const TextStyle(
+                                    color: AppTheme.ink,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           const PopupMenuItem<String>(
                             value: 'logout',
-                            child: Text('Cerrar sesion'),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.logout_rounded,
+                                  color: AppTheme.ink,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 10),
+                                Text('Cerrar sesión'),
+                              ],
+                            ),
                           ),
                         ],
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: const Color(0xFFE6F6EA),
-                          child: Text(
-                            widget.session.username.isEmpty
-                                ? 'U'
-                                : widget.session.username[0].toUpperCase(),
-                            style: const TextStyle(
-                              color: AppTheme.brandGreen,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF8EE),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: const Color(0xFFD8EEDC)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.white,
+                                child: Text(
+                                  widget.session.username.isEmpty
+                                      ? 'U'
+                                      : widget.session.username[0]
+                                            .toUpperCase(),
+                                  style: const TextStyle(
+                                    color: AppTheme.brandGreen,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(
+                                Icons.expand_more_rounded,
+                                color: AppTheme.brandGreen,
+                                size: 20,
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -733,14 +809,264 @@ class _LinkDevicePage extends StatelessWidget {
   }
 }
 
-class _SimpleHomePage extends StatelessWidget {
+class _UserSummaryPage extends StatelessWidget {
+  const _UserSummaryPage({required this.summary});
+
+  final UserSummary summary;
+
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Inicio',
-        style: TextStyle(fontSize: 18, color: AppTheme.muted),
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        ScreenHeader(
+          title: 'Resumen',
+          subtitle: summary.objectiveLabel,
+          tag: summary.ageLabel,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF173F2D),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      summary.displayName,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(color: Colors.white, fontSize: 28),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${summary.genderLabel} · ${summary.activityLabel}',
+                      style: const TextStyle(
+                        color: Color(0xFFD5E6DE),
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _StatPill(
+                          label: 'Score',
+                          value: '${summary.userScore}',
+                          accent: const Color(0xFF16B548),
+                        ),
+                        const SizedBox(width: 10),
+                        _StatPill(
+                          label: 'Meta',
+                          value: summary.targetWeightKg > 0
+                              ? '${summary.targetWeightKg.toStringAsFixed(1)} kg'
+                              : 'Sin meta',
+                          accent: const Color(0xFF1E9ADF),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SectionTitle('MACROS DE HOY'),
+              ...summary.macros.map(
+                (macro) => _MacroProgressCard(macro: macro),
+              ),
+              const SectionTitle('DATOS CLAVE'),
+              Row(
+                children: [
+                  SummaryCard(
+                    value: summary.weightKg > 0
+                        ? summary.weightKg.toStringAsFixed(1)
+                        : '--',
+                    label: 'Peso kg',
+                    accent: AppTheme.brandGreen,
+                  ),
+                  const SizedBox(width: 10),
+                  SummaryCard(
+                    value: summary.heightCm > 0
+                        ? summary.heightCm.toStringAsFixed(0)
+                        : '--',
+                    label: 'Altura cm',
+                    accent: AppTheme.skyBlue,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9F5),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _KeyValueRow(
+                      label: 'Calorias objetivo',
+                      value: summary.dailyCalories > 0
+                          ? '${summary.dailyCalories.toStringAsFixed(0)} kcal'
+                          : 'Sin configurar',
+                    ),
+                    const SizedBox(height: 10),
+                    _KeyValueRow(
+                      label: 'Tipo de dieta',
+                      value: summary.dietLabel,
+                    ),
+                    const SizedBox(height: 10),
+                    _KeyValueRow(
+                      label: 'Alergias',
+                      value: summary.allergies.isEmpty
+                          ? 'Sin alergias registradas'
+                          : summary.allergies.join(', '),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatPill extends StatelessWidget {
+  const _StatPill({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(color: Color(0xFFD5E6DE), fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                color: accent,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _MacroProgressCard extends StatelessWidget {
+  const _MacroProgressCard({required this.macro});
+
+  final MacroStatus macro;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Color(macro.accentHex);
+    final targetLabel = macro.target > 0
+        ? '${macro.consumed.toStringAsFixed(0)} / ${macro.target.toStringAsFixed(0)} ${macro.unit}'
+        : '${macro.consumed.toStringAsFixed(0)} ${macro.unit}';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accent.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                macro.label,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontSize: 15),
+              ),
+              const Spacer(),
+              Text(
+                targetLabel,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: macro.progress,
+              minHeight: 10,
+              backgroundColor: accent.withValues(alpha: 0.12),
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KeyValueRow extends StatelessWidget {
+  const _KeyValueRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: AppTheme.muted, fontSize: 13),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              color: AppTheme.ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

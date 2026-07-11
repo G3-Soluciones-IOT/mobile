@@ -29,6 +29,38 @@ class RemoteIoTDataSource {
     };
   }
 
+  Future<RegisteredIoTDevice> registerDevice({
+    required int userId,
+    required String deviceId,
+    required String deviceType,
+  }) async {
+    final url = MicroserviceEndpoints.iotDevices;
+    final response = await _post(
+      url,
+      body: jsonEncode({
+        'userId': userId,
+        'deviceId': deviceId.trim(),
+        'deviceType': deviceType,
+      }),
+    );
+
+    _ensureSuccess(
+      response,
+      url,
+      defaultMessage: 'No se pudo registrar el dispositivo.',
+    );
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return RegisteredIoTDevice(
+      deviceId: '${json['deviceId'] ?? deviceId.trim()}',
+      userId: (json['userId'] as num?)?.toInt() ?? userId,
+      deviceType: '${json['deviceType'] ?? deviceType}',
+      apiKey: '${json['apiKey'] ?? ''}',
+      status: '${json['status'] ?? 'ACTIVE'}',
+      registeredAt: '${json['registeredAt'] ?? ''}',
+    );
+  }
+
   Future<IoTOverview> fetchOverview() async {
     final today = DateTime.now();
     final yesterday = today.subtract(const Duration(days: 1));
@@ -253,11 +285,52 @@ class RemoteIoTDataSource {
     }
   }
 
-  void _ensureSuccess(http.Response response, String url) {
+  Future<http.Response> _post(String url, {required String body}) async {
+    try {
+      return await client
+          .post(
+            Uri.parse(url),
+            headers: {..._headers, 'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(_requestTimeout);
+    } on Exception {
+      throw RemoteIoTException(
+        'No se pudo conectar con el backend IoT al enviar datos a $url',
+      );
+    }
+  }
+
+  void _ensureSuccess(
+    http.Response response,
+    String url, {
+    String? defaultMessage,
+  }) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
+    final backendMessage = _errorMessageFromResponse(response.body);
     throw RemoteIoTException(
-      'IoT service respondio ${response.statusCode} al consultar $url',
+      backendMessage ??
+          defaultMessage ??
+          'IoT service respondio ${response.statusCode} al consultar $url',
     );
+  }
+
+  String? _errorMessageFromResponse(String body) {
+    if (body.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) return null;
+      for (final key in ['message', 'error', 'details']) {
+        final value = decoded[key];
+        final text = '$value'.trim();
+        if (text.isNotEmpty && text != 'null') {
+          return text;
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
   }
 
   Future<RemoteTrackingSnapshot> fetchTrackingSnapshot(int userId) async {

@@ -10,11 +10,13 @@ class ScreenHeader extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.tag,
+    this.onBack,
   });
 
   final String title;
   final String subtitle;
   final String? tag;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +27,26 @@ class ScreenHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (onBack != null) ...[
+            InkWell(
+              onTap: onBack,
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           Text(
             title,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(

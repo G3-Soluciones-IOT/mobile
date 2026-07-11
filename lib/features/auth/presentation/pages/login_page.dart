@@ -105,8 +105,8 @@ class _LoginPageState extends State<LoginPage> {
                                 const SizedBox(height: 8),
                                 Text(
                                   _isSignUpMode
-                                      ? 'Registra tu usuario para entrar a JameoFit desde mobile.'
-                                      : 'Ingresa tus credenciales para conectar la app con los microservicios.',
+                                      ? 'Crea tu cuenta para empezar a usar JameoFit.'
+                                      : 'Ingresa con tu cuenta para continuar en JameoFit.',
                                   style: const TextStyle(
                                     color: Color(0xFF6E7A96),
                                     fontSize: 14,
@@ -155,7 +155,7 @@ class _LoginPageState extends State<LoginPage> {
                                   },
                                 ),
                                 const SizedBox(height: 16),
-                                _InputLabel(label: 'Contrasena'),
+                                _InputLabel(label: 'Contraseña'),
                                 const SizedBox(height: 8),
                                 TextFormField(
                                   controller: _passwordController,
@@ -167,21 +167,21 @@ class _LoginPageState extends State<LoginPage> {
                                   decoration: _inputDecoration(
                                     _isSignUpMode
                                         ? 'Minimo 8 caracteres'
-                                        : 'Ingresa tu contrasena',
+                                        : 'Ingresa tu contraseña',
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Ingresa tu contrasena.';
+                                      return 'Ingresa tu contraseña.';
                                     }
                                     if (_isSignUpMode && value.length < 8) {
-                                      return 'La contrasena debe tener al menos 8 caracteres.';
+                                      return 'La contraseña debe tener al menos 8 caracteres.';
                                     }
                                     return null;
                                   },
                                 ),
                                 if (_isSignUpMode) ...[
                                   const SizedBox(height: 16),
-                                  _InputLabel(label: 'Confirmar contrasena'),
+                                  _InputLabel(label: 'Confirmar contraseña'),
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: _confirmPasswordController,
@@ -189,14 +189,14 @@ class _LoginPageState extends State<LoginPage> {
                                     textInputAction: TextInputAction.done,
                                     onFieldSubmitted: (_) => _submit(),
                                     decoration: _inputDecoration(
-                                      'Repite tu contrasena',
+                                      'Repite tu contraseña',
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
-                                        return 'Confirma tu contrasena.';
+                                        return 'Confirma tu contraseña.';
                                       }
                                       if (value != _passwordController.text) {
-                                        return 'Las contrasenas no coinciden.';
+                                        return 'Las contraseñas no coinciden.';
                                       }
                                       return null;
                                     },
@@ -262,7 +262,7 @@ class _LoginPageState extends State<LoginPage> {
                                                 : 'No tienes cuenta. ',
                                           ),
                                           const TextSpan(
-                                            text: 'Cambia aqui',
+                                            text: 'Cambia aquí',
                                             style: TextStyle(
                                               color: AppTheme.brandGreen,
                                               fontWeight: FontWeight.w700,
@@ -276,7 +276,7 @@ class _LoginPageState extends State<LoginPage> {
                                 if (_isSignUpMode) ...[
                                   const SizedBox(height: 8),
                                   const Text(
-                                    'Por ahora el registro mobile crea solo el usuario en IAM.',
+                                    'Podrás completar tu perfil después de crear tu cuenta.',
                                     style: TextStyle(
                                       color: Color(0xFF8892A6),
                                       fontSize: 12.5,
@@ -431,8 +431,8 @@ class _HeroPanel extends StatelessWidget {
                     const SizedBox(height: 10),
                     Text(
                       isSignUpMode
-                          ? 'Empieza en JameoFit con una cuenta lista para conectarse al backend.'
-                          : 'Inicia sesion y entra a tu experiencia fitness conectada con datos reales.',
+                          ? 'Crea tu cuenta y empieza a llevar tu progreso en un solo lugar.'
+                          : 'Inicia sesión y continúa con tu experiencia en JameoFit.',
                       style: const TextStyle(
                         color: Color(0xFFD7E5DE),
                         fontSize: 14.5,

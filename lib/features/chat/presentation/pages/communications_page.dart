@@ -162,7 +162,7 @@ class _ConversationViewState extends State<_ConversationView> {
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(contact.displayName, style: const TextStyle(color: AppTheme.ink, fontWeight: FontWeight.w800, fontSize: 17)),
-            Text(state.connectionStatus == ChatConnectionStatus.connected ? 'En línea' : 'Reconectando…', style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+            Text(_connectionLabel(state.connectionStatus), style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
           ])),
         ]),
       ),
@@ -231,7 +231,20 @@ class _ConnectionIndicator extends StatelessWidget {
   const _ConnectionIndicator({required this.status});
   final ChatConnectionStatus status;
   @override
-  Widget build(BuildContext context) => Text(status == ChatConnectionStatus.connected ? 'En línea' : 'Conectando…', style: const TextStyle(color: AppTheme.muted, fontSize: 12));
+  Widget build(BuildContext context) => Text(_connectionLabel(status), style: const TextStyle(color: AppTheme.muted, fontSize: 12));
+}
+
+String _connectionLabel(ChatConnectionStatus status) {
+  switch (status) {
+    case ChatConnectionStatus.connected:
+      return 'En línea';
+    case ChatConnectionStatus.connecting:
+      return 'Conectando…';
+    case ChatConnectionStatus.disconnected:
+      return 'Sin conexión';
+    case ChatConnectionStatus.error:
+      return 'Reconectando…';
+  }
 }
 
 class _ErrorBanner extends StatelessWidget {

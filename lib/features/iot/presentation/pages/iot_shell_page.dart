@@ -75,7 +75,9 @@ class _IoTShellPageState extends State<IoTShellPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_index == 4) return _buildCommunicationsShell(context);
+    // The shell has six destinations after the appointments merge. Chat is
+    // index 5; index 4 is the independent Coach IA feature.
+    if (_index == 5) return _buildCommunicationsShell(context);
     return StreamBuilder<IoTState>(
       stream: widget.bloc.stream,
       initialData: widget.bloc.state,
@@ -92,7 +94,7 @@ class _IoTShellPageState extends State<IoTShellPage> {
                   const CircularProgressIndicator(color: AppTheme.brandGreen),
                   const SizedBox(height: 16),
                   TextButton(
-                    onPressed: () => setState(() => _index = 4),
+                    onPressed: () => setState(() => _index = 5),
                     child: const Text('Abrir Comunicaciones'),
                   ),
                 ],
@@ -124,7 +126,7 @@ class _IoTShellPageState extends State<IoTShellPage> {
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: () => setState(() => _index = 4),
+                      onPressed: () => setState(() => _index = 5),
                       child: const Text('Abrir Comunicaciones'),
                     ),
                   ],
@@ -1466,10 +1468,20 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
-    final items = <String>['Inicio', 'Citas', 'Historial', 'IoT', 'Coach IA', 'Chat'];
+    const items = <_NavigationItem>[
+      _NavigationItem('Inicio', Icons.home_rounded, Icons.home_outlined),
+      _NavigationItem(
+        'Citas',
+        Icons.calendar_month_rounded,
+        Icons.calendar_month_outlined,
+      ),
+      _NavigationItem('Historial', Icons.history_rounded, Icons.history_outlined),
+      _NavigationItem('IoT', Icons.devices_other_rounded, Icons.devices_other_outlined),
+      _NavigationItem('Coach IA', Icons.auto_awesome_rounded, Icons.auto_awesome_outlined),
+      _NavigationItem('Chat', Icons.forum_rounded, Icons.forum_outlined),
+    ];
     return Container(
-      height: 56,
+      height: 68,
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFE7E7E7))),
         color: Colors.white,
@@ -1478,18 +1490,56 @@ class _BottomNav extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: List.generate(items.length, (itemIndex) {
           final selected = itemIndex == index;
+          final item = items[itemIndex];
           return Expanded(
-            child: InkWell(
-              onTap: () => onChanged(itemIndex),
-              child: Center(
-                child: Text(
-                  items[itemIndex],
-                  style: TextStyle(
-                    color: selected
-                        ? AppTheme.brandGreen
-                        : const Color(0xFFC8C1BB),
-                    fontSize: 14,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            child: Semantics(
+              button: true,
+              selected: selected,
+              label: item.label,
+              child: InkWell(
+                onTap: () => onChanged(itemIndex),
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppTheme.softGreen
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Icon(
+                          selected ? item.selectedIcon : item.icon,
+                          size: 21,
+                          color: selected
+                              ? AppTheme.brandGreen
+                              : const Color(0xFF8A96A8),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selected
+                              ? AppTheme.brandGreen
+                              : const Color(0xFF8A96A8),
+                          fontSize: 10,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1499,4 +1549,12 @@ class _BottomNav extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NavigationItem {
+  const _NavigationItem(this.label, this.selectedIcon, this.icon);
+
+  final String label;
+  final IconData selectedIcon;
+  final IconData icon;
 }

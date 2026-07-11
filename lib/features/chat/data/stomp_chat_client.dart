@@ -38,7 +38,7 @@ class StompChatClient implements ChatTransport {
     _states.add(ChatConnectionStatus.connecting);
     final headers = {'Authorization': 'Bearer $token'};
     _client = StompClient(
-      config: StompConfig(
+      config: StompConfig.sockJS(
         url: MicroserviceEndpoints.chatWebSocketUrl,
         stompConnectHeaders: headers,
         webSocketConnectHeaders: headers,
@@ -75,6 +75,10 @@ class StompChatClient implements ChatTransport {
         onWebSocketError: (_) {
           _connected = false;
           if (!_disposed) _states.add(ChatConnectionStatus.error);
+        },
+        onWebSocketDone: () {
+          _connected = false;
+          if (!_disposed) _states.add(ChatConnectionStatus.disconnected);
         },
       ),
     )..activate();

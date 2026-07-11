@@ -35,6 +35,46 @@ class CoachPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: Tooltip(
+                  message:
+                      'El Coach IA ofrece orientación informativa. No reemplaza '
+                      'la evaluación de un nutricionista ni de otro profesional de salud.',
+                  triggerMode: TooltipTriggerMode.tap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F5F1),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0xFFDDE4DB)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 14,
+                          color: AppTheme.muted,
+                        ),
+                        SizedBox(width: 5),
+                        Text(
+                          'Uso informativo',
+                          style: TextStyle(
+                            color: AppTheme.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               if (isPremium) ...[
                 FutureBuilder<HomeTip?>(
                   future: homeTipFuture,
@@ -77,11 +117,18 @@ class CoachPage extends StatelessWidget {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF173F2D), Color(0xFF2E6B51)],
+                            colors: [Color(0xFF143D2B), Color(0xFF2E7353)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x22132F20),
+                              blurRadius: 12,
+                              offset: Offset(0, 5),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,26 +197,35 @@ class CoachPage extends StatelessWidget {
                 ),
               ],
 
-              const SizedBox(height: 10),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: const Color(0xFFEBEBEB)),
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F9F6),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE5EAE3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.insights_outlined,
+                      color: AppTheme.brandGreen,
+                      size: 19,
+                    ),
+                    SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        'Tus recomendaciones se basan en tu actividad, objetivos y datos registrados.',
+                        style: TextStyle(
+                          color: AppTheme.muted,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  const CircleAvatar(
-                    radius: 17,
-                    backgroundColor: AppTheme.brandGreen,
-                  ),
-                ],
+                  ],
+                ),
               ),
 
               if (!isPremium) ...[
@@ -177,9 +233,16 @@ class CoachPage extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppTheme.softOrange,
+                    color: const Color(0xFFFFF8E9),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.amber.shade300),
+                    border: Border.all(color: const Color(0xFFF2D98C)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x120D1D12),
+                        blurRadius: 10,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
@@ -194,7 +257,7 @@ class CoachPage extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              '💎 Desbloquea el Coach IA Premium',
+                              'Desbloquea Coach IA Premium',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 14,
@@ -202,7 +265,7 @@ class CoachPage extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Recomendaciones personalizadas con IA, análisis avanzado y planes automáticos.',
+                              'Recibe recomendaciones personalizadas y análisis de tus avances.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.muted,
